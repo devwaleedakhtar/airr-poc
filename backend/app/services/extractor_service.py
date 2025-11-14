@@ -100,6 +100,7 @@ def extract_from_pdf(pdf_path: str) -> ExtractionResult:
     text = _read_pdf_text(pdf_path)
     prompt = _build_prompt(base_prompt, text)
 
+    # Use configured base URL (defaults to OpenAI public API)
     client = OpenAI(api_key=settings.model_api_key, base_url=settings.openai_base_url)
 
     resp = client.chat.completions.create(
@@ -126,4 +127,3 @@ def extract_from_pdf(pdf_path: str) -> ExtractionResult:
         warnings=warnings,
         text_snippets=snippets,
     )
-

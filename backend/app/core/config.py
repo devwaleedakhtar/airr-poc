@@ -9,9 +9,9 @@ class Settings(BaseSettings):
     model_name: str = Field(..., alias="MODEL_NAME")
     model_api_key: str = Field(..., alias="MODEL_API_KEY")
 
-    # Gemini-compatible OpenAI endpoint
+    # OpenAI base URL by default; override via OPENAI_BASE_URL for alternatives (e.g., Gemini-compatible proxy)
     openai_base_url: str = Field(
-        default="https://generativelanguage.googleapis.com/openai/v1",
+        default="https://api.openai.com/v1",
         alias="OPENAI_BASE_URL",
     )
 
