@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from .mapping import MappingResult
+
 
 class SessionModel(BaseModel):
     id: str = Field(..., alias="_id")
@@ -17,6 +19,7 @@ class SessionModel(BaseModel):
     warnings: Optional[List[str]] = None
     text_snippets: Optional[Dict[str, str]] = None
     final_json: Optional[Dict[str, Any]] = None
+    mapping: Optional[MappingResult] = None
     created_at: datetime
     updated_at: datetime
 

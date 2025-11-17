@@ -6,6 +6,8 @@ from typing import Any, Dict, List, Optional
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from ..schemas.mapping import MappingResult
+
 
 COLLECTION = "sessions"
 
@@ -41,3 +43,15 @@ async def list_all(db: AsyncIOMotorDatabase, limit: int = 100) -> List[Dict[str,
     cursor = db[COLLECTION].find().sort("created_at", -1).limit(limit)
     return [_to_str_id(doc) async for doc in cursor]
 
+
+async def set_mapping(
+    db: AsyncIOMotorDatabase,
+    session_id: str,
+    mapping: MappingResult,
+) -> None:
+    payload = mapping.model_dump()
+    payload["metadata"]["generated_at"] = mapping.metadata.generated_at
+    await db[COLLECTION].update_one(
+        {"_id": ObjectId(session_id)},
+        {"$set": {"mapping": payload, "updated_at": datetime.utcnow()}},
+    )

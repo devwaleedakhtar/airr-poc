@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..core.db import db_dependency
 from ..repositories import sessions_repo
+from ..schemas.mapping import MappingResult
 from ..schemas.sessions import SessionListItem, UpdateSessionRequest, SessionModel
+from ..services import mapping_service
 
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -42,3 +44,29 @@ async def update_session(session_id: str, payload: UpdateSessionRequest, db=Depe
     if not doc:
         raise HTTPException(status_code=404, detail="Session not found after update")
     return doc
+
+
+@router.post("/{session_id}/map", response_model=MappingResult)
+async def generate_mapping(session_id: str, db=Depends(db_dependency)):
+    doc = await sessions_repo.get(db, session_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Session not found")
+    source = doc.get("final_json") or doc.get("extracted_json")
+    if not source:
+        raise HTTPException(status_code=400, detail="Session has no extracted data to map")
+    try:
+        result = mapping_service.map_to_canonical(source)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    await sessions_repo.set_mapping(db, session_id, result)
+    return result
+
+
+@router.put("/{session_id}/mapping", response_model=MappingResult)
+async def save_mapping(session_id: str, payload: MappingResult, db=Depends(db_dependency)):
+    doc = await sessions_repo.get(db, session_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Session not found")
+    normalized = mapping_service.normalize_mapping(payload)
+    await sessions_repo.set_mapping(db, session_id, normalized)
+    return normalized

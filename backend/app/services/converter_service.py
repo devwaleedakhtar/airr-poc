@@ -117,9 +117,16 @@ def _prepare_single_sheet_workbook(src_path: str, sheet_name: str) -> str:
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.print_options.horizontalCentered = True
 
-    # Hide all other sheets; keep only target visible and active
+    # Hide all other sheets; keep only target visible and active.
+    # Non-target sheets are marked veryHidden and their print areas cleared
+    # so they are less likely to be included by external exporters.
     for name in wb.sheetnames:
-        wb[name].sheet_state = "visible" if name == sheet_name else "hidden"
+        sheet = wb[name]
+        if name == sheet_name:
+            sheet.sheet_state = "visible"
+        else:
+            sheet.sheet_state = "veryHidden"
+            sheet.print_area = None
     wb.active = wb.sheetnames.index(sheet_name)
 
     suffix = ".xlsm" if keep_vba else ".xlsx"

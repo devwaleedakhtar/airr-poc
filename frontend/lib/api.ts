@@ -5,7 +5,13 @@ export type UploadResponse = {
 
 export type ConvertResponse = { pdf_url: string };
 
-import type { SessionDetail, SessionListItem, ExtractedJson, Confidences } from "@/types/extraction";
+import type {
+  SessionDetail,
+  SessionListItem,
+  ExtractedJson,
+  Confidences,
+} from "@/types/extraction";
+import type { MappingResult } from "@/types/mapping";
 
 export type ExtractResponse = {
   session_id: string;
@@ -70,6 +76,23 @@ export async function updateSession(sessionId: string, final_json: JsonObject): 
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ final_json }),
+  });
+  return json(res);
+}
+
+export async function mapSession(sessionId: string): Promise<MappingResult> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/map`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  return json(res);
+}
+
+export async function saveMapping(sessionId: string, mapping: MappingResult): Promise<MappingResult> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/mapping`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(mapping),
   });
   return json(res);
 }

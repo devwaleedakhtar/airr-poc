@@ -48,7 +48,8 @@ async def upload_workbook(
     try:
         read_path = _ensure_xlsx(tmp_path)
         wb = load_workbook(read_path, read_only=True, data_only=True)
-        sheets = list(wb.sheetnames)
+        # Only expose visible sheets in the UI to match analyst expectations
+        sheets = [ws.title for ws in wb.worksheets if getattr(ws, "sheet_state", "visible") == "visible"]
         wb.close()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to read workbook: {e}")

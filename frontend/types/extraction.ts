@@ -1,4 +1,5 @@
 import type { JsonObject, JsonValue } from "./json";
+import type { MappingResult } from "./mapping";
 
 export type ConfidenceLevel = "high" | "medium" | "low";
 
@@ -24,7 +25,7 @@ export interface SessionDetail {
   warnings?: string[];
   text_snippets?: Record<string, string>;
   final_json?: JsonObject | null;
+  mapping?: MappingResult | null;
   created_at: string;
   updated_at: string;
 }
-

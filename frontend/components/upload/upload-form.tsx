@@ -22,11 +22,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const MAX_FILE_SIZE = 10485760; // 10 MB in bytes
+
 export default function UploadForm() {
   const router = useRouter();
   const [state, setState] = useState<UploadState>({ step: "idle" });
 
   const onFileChange = async (file: File) => {
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("File size too large", {
+        description: `File size is ${(file.size / 1024 / 1024).toFixed(2)} MB. Maximum allowed is 10 MB.`,
+      });
+      return;
+    }
+
     setState({ step: "uploading" });
     try {
       const res = await uploadWorkbook(file);
