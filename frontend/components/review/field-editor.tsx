@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { JsonValue } from "@/types/json";
@@ -27,7 +27,7 @@ export default function FieldEditor({ value, onChange, onFocus }: Props) {
 
   useEffect(() => {
     if (primitive) setText(String(value ?? ""));
-    else setJsonText(JSON.stringify(value as any, null, 2));
+    else setJsonText(JSON.stringify(value as Exclude<JsonValue, string | number | boolean | null>, null, 2));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [primitive]);
 
@@ -55,7 +55,7 @@ export default function FieldEditor({ value, onChange, onFocus }: Props) {
             const parsed = JSON.parse(jsonText);
             onChange(parsed);
             setJsonError(null);
-          } catch (err) {
+          } catch {
             setJsonError("Invalid JSON");
           }
         }}

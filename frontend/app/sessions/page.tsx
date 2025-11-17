@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { Eye } from "lucide-react";
 import { listSessions } from "@/lib/api";
 import { H1, P } from "@/components/ui/typography";
+import { Button } from "@/components/ui/button";
 
 export default async function SessionsPage() {
   const sessions = await listSessions();
@@ -17,8 +19,11 @@ export default async function SessionsPage() {
                 <div className="font-medium">{s.sheet_name}</div>
                 <P className="text-xs">{new Date(s.created_at).toLocaleString()}</P>
               </div>
-              <Link className="text-primary underline" href={`/review/${s._id}`}>
-                View
+              <Link href={`/review/${s._id}`}>
+                <Button variant="ghost" size="sm">
+                  <Eye className="w-4 h-4 mr-2" />
+                  View
+                </Button>
               </Link>
             </li>
           ))}

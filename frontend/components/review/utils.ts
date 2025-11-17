@@ -18,13 +18,12 @@ export function flattenExtracted(
   return { fields };
 }
 
-import type { JsonObject } from "@/types/json";
-
 export function unflattenToJson(fields: ReviewField[]): JsonObject {
   const out: JsonObject = {};
   for (const f of fields) {
     if (!out[f.table]) out[f.table] = {};
-    out[f.table][f.key] = f.value;
+    const tableObj = out[f.table] as JsonObject;
+    tableObj[f.key] = f.value;
   }
   return out;
 }
@@ -50,9 +49,10 @@ export function groupExtracted(
 export function toNestedJson(tables: ReviewTable[]): JsonObject {
   const out: JsonObject = {};
   for (const t of tables) {
-    out[t.name] = out[t.name] || {};
+    if (!out[t.name]) out[t.name] = {};
+    const tableObj = out[t.name] as JsonObject;
     for (const f of t.fields) {
-      out[t.name][f.key] = f.value;
+      tableObj[f.key] = f.value;
     }
   }
   return out;

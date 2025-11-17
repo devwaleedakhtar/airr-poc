@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import type { SessionDetail } from "@/types/extraction";
+import type { JsonValue } from "@/types/json";
 import { updateSession } from "@/lib/api";
 import { groupExtracted, toNestedJson } from "./utils";
-import type { ReviewField, ReviewTable } from "./types";
-import { Input } from "@/components/ui/input";
+import type { ReviewTable } from "./types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -37,7 +37,7 @@ export default function ReviewEditor({ session }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<"extracted" | "edited">("edited");
 
-  const onChange = (tIdx: number, fIdx: number, value: any) => {
+  const onChange = (tIdx: number, fIdx: number, value: JsonValue) => {
     setTables((prev) =>
       prev.map((t, i) =>
         i === tIdx
@@ -83,7 +83,7 @@ export default function ReviewEditor({ session }: Props) {
                       <div className="col-span-6">
                         <FieldEditor
                           value={f.value}
-                          onChange={(v) => onChange(ti, fi, v as any)}
+                          onChange={(v) => onChange(ti, fi, v)}
                           onFocus={() => setActive(`${f.table}.${f.key}`)}
                         />
                       </div>
