@@ -27,7 +27,7 @@ export function Header() {
         {/* Logo and Brand */}
         <Link href="/" className="flex items-center gap-2 font-semibold text-lg hover:opacity-80 transition-opacity">
           <FileSpreadsheet className="h-6 w-6" />
-          <span>AIRR</span>
+          <span>Perpetuity POC</span>
         </Link>
 
         {/* Navigation */}
