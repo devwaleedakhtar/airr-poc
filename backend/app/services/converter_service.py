@@ -10,6 +10,7 @@ from typing import Tuple
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.properties import PageSetupProperties
+from openpyxl.cell.cell import MergedCell
 
 from ..core.config import settings
 
@@ -41,11 +42,17 @@ def _compute_used_range(ws) -> Tuple[int, int, int, int]:
 
 
 def _autofit_columns(ws) -> None:
-    col_max = {}
+    col_max: dict[str, int] = {}
     for row in ws.iter_rows():
         for cell in row:
+            # Skip merged-cell placeholders that don't behave like normal cells.
+            if isinstance(cell, MergedCell):
+                continue
             val = "" if cell.value is None else str(cell.value)
-            col_max[cell.column_letter] = max(col_max.get(cell.column_letter, 0), len(val))
+            col_letter = getattr(cell, "column_letter", None)
+            if not col_letter:
+                continue
+            col_max[col_letter] = max(col_max.get(col_letter, 0), len(val))
     for col_letter, max_len in col_max.items():
         ws.column_dimensions[col_letter].width = min(max(10, max_len + 2), 60)
 

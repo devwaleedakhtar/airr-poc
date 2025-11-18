@@ -25,10 +25,47 @@ import type { JsonObject } from "@/types/json";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
+function normalizeErrorMessage(message: string, status: number): string {
+  if (!message) {
+    return `Request failed with status ${status}.`;
+  }
+
+  // Backend extraction: no text in PDF
+  if (message.includes("PDF contains no extractable text")) {
+    return "We couldn't read any text from this PDF. Make sure the worksheet exports as a text-based PDF (not an image-only scan).";
+  }
+
+  // Backend extraction: model output not parsable as JSON
+  if (message.includes("Model returned no parsable JSON for this PDF")) {
+    return "We couldn't interpret this sheet as structured data. Try simplifying the layout or removing unusual formatting, then run extraction again.";
+  }
+
+  // Strip raw LLM output snippet if present.
+  const rawIndex = message.indexOf("Raw output (truncated):");
+  if (rawIndex !== -1) {
+    const trimmed = message.slice(0, rawIndex).trim();
+    if (trimmed) return trimmed;
+  }
+
+  return message;
+}
+
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    const msg = await res.text();
-    throw new Error(msg || `HTTP ${res.status}`);
+    const raw = await res.text();
+    // FastAPI error responses are typically {"detail": "..."}; surface that directly.
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && "detail" in parsed) {
+        const detail = (parsed as { detail?: unknown }).detail;
+        if (typeof detail === "string") {
+          throw new Error(normalizeErrorMessage(detail, res.status));
+        }
+      }
+    } catch {
+      // fall back to raw text below
+    }
+    throw new Error(normalizeErrorMessage(raw, res.status));
   }
   return res.json();
 }

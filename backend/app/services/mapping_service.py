@@ -208,7 +208,7 @@ def map_to_canonical(source_json: Dict[str, Any]) -> MappingResult:
         raise ValueError("Source JSON is empty; cannot perform mapping.")
 
     prompt = _build_prompt(source_json)
-    client = OpenAI(api_key=settings.model_api_key, base_url=settings.openai_base_url)
+    client = OpenAI(api_key=settings.model_api_key)
     response = client.chat.completions.create(
         model=settings.model_name,
         temperature=0.0,
