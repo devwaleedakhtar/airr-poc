@@ -65,8 +65,8 @@ export default function ReviewEditor({ session }: Props) {
     session.text_snippets?.[`${table}.${key}`];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2 space-y-4">
+    <div className="space-y-4">
+      <div className="space-y-4">
         <H1 className="text-2xl">Review & Fix</H1>
         <P>Fill missing or low-confidence fields. Use the snippet panel for context.</P>
         <Accordion type="multiple" className="rounded border divide-y">
@@ -102,7 +102,7 @@ export default function ReviewEditor({ session }: Props) {
           {error && <P className="text-red-600">{error}</P>}
         </div>
       </div>
-      <div className="lg:col-span-1 space-y-4">
+      <div className="hidden space-y-4">
         <div>
           <H3 className="text-lg">Matched Snippet</H3>
           <ScrollArea className="h-[40vh] rounded border p-3">
