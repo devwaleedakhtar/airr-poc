@@ -27,3 +27,4 @@
 /backend/alembic.ini.example.bak.6
 /backend/.env.local
 ./dev
+dev
