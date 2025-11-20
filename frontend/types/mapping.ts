@@ -1,6 +1,6 @@
 import type { JsonValue } from "./json";
 
-export type CanonicalMapping = Record<string, Record<string, JsonValue>>;
+export type CanonicalMapping = Record<string, JsonValue>;
 
 export type MissingField = {
   table: string;

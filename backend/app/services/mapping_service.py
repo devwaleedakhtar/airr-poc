@@ -5,7 +5,7 @@ from datetime import datetime
 from functools import lru_cache
 from hashlib import sha1
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import yaml
 from openai import OpenAI
@@ -19,95 +19,102 @@ MODEL_SCHEMA_PATH = BASE_DIR / "constants" / "model_schema.yaml"
 MAPPING_PROMPT_PATH = BASE_DIR / "prompts" / "mapping_prompt.txt"
 
 
-@lru_cache(maxsize=1)
-def _load_model_schema() -> Dict[str, Any]:
-    with MODEL_SCHEMA_PATH.open("r", encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
+def _raw_schema_text() -> str:
+    return MODEL_SCHEMA_PATH.read_text(encoding="utf-8")
 
 
 @lru_cache(maxsize=1)
 def _schema_version() -> str:
-    raw = MODEL_SCHEMA_PATH.read_text(encoding="utf-8")
+    raw = _raw_schema_text()
     return sha1(raw.encode("utf-8")).hexdigest()[:12]
 
 
 @lru_cache(maxsize=1)
-def _canonical_catalog() -> Tuple[Dict[str, List[str]], Dict[str, str], Dict[str, Dict[str, str]]]:
+def _load_model_schema() -> Dict[str, Any]:
+    raw = yaml.safe_load(_raw_schema_text()) or {}
+    return raw.get("model_schema") or raw
+
+
+@lru_cache(maxsize=1)
+def _schema_sections() -> Dict[str, Dict[str, Any]]:
+    """Return only the domain sections (skip name/version/description/etc.)."""
     schema = _load_model_schema()
-    table_fields: Dict[str, List[str]] = {}
-    table_labels: Dict[str, str] = {}
-    field_labels: Dict[str, Dict[str, str]] = {}
-
-    def add_section(section: Dict[str, Any], bucket: Dict[str, str], order: List[str]):
-        if not isinstance(section, dict):
-            return
-        for field_name, field_meta in section.items():
-            if field_name not in bucket:
-                order.append(field_name)
-            bucket[field_name] = field_meta.get("label") or field_name
-
-    for table in schema.get("tables", []):
-        table_name = table.get("name")
-        if not table_name:
+    sections: Dict[str, Dict[str, Any]] = {}
+    for key, value in schema.items():
+        if key in {"name", "version", "description", "conventions", "mapping_guidance"}:
             continue
-        table_labels[table_name] = table.get("label") or table_name
-        field_labels[table_name] = {}
-        table_fields[table_name] = []
-
-        add_section(table.get("fields") or {}, field_labels[table_name], table_fields[table_name])
-        add_section(table.get("columns") or {}, field_labels[table_name], table_fields[table_name])
-        add_section(table.get("series") or {}, field_labels[table_name], table_fields[table_name])
-        summary_fields = (table.get("summary_row") or {}).get("fields") or {}
-        add_section(summary_fields, field_labels[table_name], table_fields[table_name])
-
-    return table_fields, table_labels, field_labels
+        if isinstance(value, dict) and value.get("kind"):
+            sections[key] = value
+    return sections
 
 
 @lru_cache(maxsize=1)
 def _table_fields() -> Dict[str, List[str]]:
-    return _canonical_catalog()[0]
+    """Flatten per-section field/column names to support missing-field scaffolding."""
+    out: Dict[str, List[str]] = {}
+    for name, section in _schema_sections().items():
+        kind = section.get("kind")
+        if kind == "scalar_group":
+            fields = section.get("fields") or {}
+            out[name] = list(fields.keys())
+        elif kind == "table":
+            columns = section.get("columns") or {}
+            out[name] = list(columns.keys())
+    return out
 
 
 @lru_cache(maxsize=1)
 def _table_labels() -> Dict[str, str]:
-    return _canonical_catalog()[1]
+    return {name: section.get("label") or name for name, section in _schema_sections().items()}
 
 
 @lru_cache(maxsize=1)
 def _field_labels() -> Dict[str, Dict[str, str]]:
-    return _canonical_catalog()[2]
+    labels: Dict[str, Dict[str, str]] = {}
+    for name, section in _schema_sections().items():
+        kind = section.get("kind")
+        labels[name] = {}
+        if kind == "scalar_group":
+            for fname, fmeta in (section.get("fields") or {}).items():
+                labels[name][fname] = fmeta.get("label") or fname
+        elif kind == "table":
+            for cname, cmeta in (section.get("columns") or {}).items():
+                labels[name][cname] = cmeta.get("label") or cname
+    return labels
 
 
 @lru_cache(maxsize=1)
 def _schema_summary() -> str:
-    schema = _load_model_schema()
+    """Readable summary of the canonical schema for the prompt."""
+    sections = _schema_sections()
     lines: List[str] = []
 
-    def describe_fields(section: Dict[str, Any], prefix: str = ""):
-        if not isinstance(section, dict):
-            return []
-        entries = []
-        for field_name, field_meta in section.items():
-            aliases = field_meta.get("aliases") or []
-            alias_text = f" | aliases: {', '.join(aliases)}" if aliases else ""
-            field_label = field_meta.get("label")
-            field_type = field_meta.get("type")
-            field_desc = field_meta.get("description")
-            entries.append(
-                f"  - {prefix}{field_name} ({field_type}) :: {field_label} - {field_desc}{alias_text}"
-            )
-        return entries
+    def field_line(field_name: str, meta: Dict[str, Any]) -> str:
+        aliases = meta.get("aliases") or []
+        alias_txt = f" | aliases: {', '.join(aliases)}" if aliases else ""
+        dtype = meta.get("dtype") or meta.get("type")
+        role = meta.get("role")
+        label = meta.get("label") or field_name
+        desc = meta.get("description") or ""
+        return f"  - {field_name} [{role or 'input'}; {dtype or 'string'}] :: {label}{alias_txt} - {desc}"
 
-    for table in schema.get("tables", []):
-        table_name = table.get("name")
-        label = table.get("label")
-        description = table.get("description")
-        lines.append(f"{table_name} :: {label} - {description}")
-        lines.extend(describe_fields(table.get("fields") or {}))
-        lines.extend(describe_fields(table.get("columns") or {}, "column: "))
-        lines.extend(describe_fields(table.get("series") or {}, "series: "))
-        summary_fields = (table.get("summary_row") or {}).get("fields") or {}
-        lines.extend(describe_fields(summary_fields, "summary: "))
+    for name, section in sections.items():
+        kind = section.get("kind")
+        label = section.get("label") or name
+        desc = section.get("description") or ""
+        lines.append(f"{name} ({kind}) :: {label} - {desc}")
+
+        if kind == "scalar_group":
+            for fname, fmeta in (section.get("fields") or {}).items():
+                lines.append(field_line(fname, fmeta))
+        elif kind == "table":
+            lines.append("  columns:")
+            for cname, cmeta in (section.get("columns") or {}).items():
+                lines.append(field_line(cname, cmeta))
+            if section.get("canonical_items"):
+                items = ", ".join(section["canonical_items"].keys())
+                lines.append(f"  canonical items: {items}")
+        lines.append("")  # spacer
     return "\n".join(lines)
 
 
@@ -121,47 +128,103 @@ def _base_mapping_prompt() -> str:
         )
 
 
+def _flatten_source(source: Any, prefix: str = "", max_items: int = 400) -> List[Dict[str, Any]]:
+    """Produce a path → value listing to give the LLM stable handles.
+
+    We cap the number of items to keep the prompt bounded.
+    """
+    flat: List[Dict[str, Any]] = []
+
+    def _walk(value: Any, path: List[str]) -> None:
+        if len(flat) >= max_items:
+            return
+        if isinstance(value, dict):
+            for k, v in value.items():
+                _walk(v, path + [str(k)])
+        elif isinstance(value, list):
+            for idx, item in enumerate(value):
+                _walk(item, path + [str(idx)])
+        else:
+            flat.append({"path": ".".join(path), "value": value})
+
+    _walk(source, path=prefix.split(".") if prefix else [])
+
+    if len(flat) > max_items:
+        return flat[:max_items] + [{"path": "...", "value": f"(truncated after {max_items} items)"}]
+    return flat
+
+
 def _build_prompt(source_json: Dict[str, Any]) -> str:
     summary = _schema_summary()
-    source_text = json.dumps(source_json, indent=2, ensure_ascii=False)
+    source_pretty = json.dumps(source_json, indent=2, ensure_ascii=False)
+    flattened = json.dumps(_flatten_source(source_json), indent=2, ensure_ascii=False)
     base = _base_mapping_prompt()
+
+    table_sections = [name for name, spec in _schema_sections().items() if spec.get("kind") == "table"]
+    scalar_sections = [name for name, spec in _schema_sections().items() if spec.get("kind") == "scalar_group"]
+
     return (
-        f"{base}\n\nCanonical Schema Definition:\n{summary}\n\n"
-        f"Source JSON (table -> field -> value):\n{source_text}\n\n"
-        "Return JSON strictly following the MappingResult schema. "
-        "Every canonical field must be present under its table in `mapped` (use null for missing).\n"
-        "Populate `missing_fields` with any canonical fields you could not confidently map. "
-        "If everything is mapped with confidence, return an empty list."
+        f"{base}\n\n"
+        f"Canonical Schema Definition:\n{summary}\n\n"
+        f"Source JSON (as provided):\n{source_pretty}\n\n"
+        f"Flattened source (path => value):\n{flattened}\n\n"
+        "Output format (STRICT):\n"
+        "{\n"
+        '  "mapped": { <section_name>: <dict or array depending on section>, ... },\n'
+        '  "missing_fields": [ { "table": "...", "field": "...", "reason": "...", "confidence": "...", "source_fields": ["..."] } ],\n'
+        '  "metadata": { "warnings": [], "model_version": "<string>" }\n'
+        "}\n\n"
+        f"- Scalar groups ({', '.join(scalar_sections)}): return an object with every canonical field present (use null for missing).\n"
+        f"- Tables ({', '.join(table_sections)}): return an array of row objects keyed by canonical column names; include only rows you can confidently map. If unknown, use an empty array.\n"
+        "- Do NOT invent data; prefer null/empty when unsure. Preserve units (%, x, $) as shown in the source when copying values.\n"
     )
 
 
-def _ensure_canonical_shape(mapped: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
-    canonical: Dict[str, Dict[str, Any]] = {}
-    fields_by_table = _table_fields()
-    for table_name, field_names in fields_by_table.items():
-        canonical[table_name] = {}
-        source_fields = mapped.get(table_name, {}) if isinstance(mapped, dict) else {}
-        for field_name in field_names:
-            value = None
-            if isinstance(source_fields, dict):
-                value = source_fields.get(field_name)
-            canonical[table_name][field_name] = value
-    # ensure tables with no explicit fields still appear
-    for table_name in fields_by_table.keys():
-        canonical.setdefault(table_name, {})
+def _ensure_canonical_shape(mapped: Dict[str, Any]) -> Dict[str, Any]:
+    canonical: Dict[str, Any] = {}
+    sections = _schema_sections()
+    for name, section in sections.items():
+        kind = section.get("kind")
+        value = mapped.get(name) if isinstance(mapped, dict) else None
+
+        if kind == "scalar_group":
+            field_defs = section.get("fields") or {}
+            source_fields = value if isinstance(value, dict) else {}
+            canonical[name] = {}
+            for fname in field_defs.keys():
+                canonical[name][fname] = source_fields.get(fname)
+        elif kind == "table":
+            # Expect an array of row objects; keep as-is, or coerce None to [].
+            if value is None:
+                canonical[name] = []
+            elif isinstance(value, list):
+                canonical[name] = value
+            else:
+                canonical[name] = value
+        else:
+            canonical[name] = value
     return canonical
 
 
 def _normalize_missing_fields(
-    missing_fields: List[MissingField], canonical: Dict[str, Dict[str, Any]]
+    missing_fields: List[MissingField], canonical: Dict[str, Any]
 ) -> List[MissingField]:
+    """Only enforce missing fields for scalar groups (tables are variable-row)."""
     table_labels = _table_labels()
     field_labels = _field_labels()
+    sections = _schema_sections()
+
     normalized: List[MissingField] = []
-    seen: set[Tuple[str, str]] = set()
+    seen: set[tuple[str, str]] = set()
 
     for item in missing_fields or []:
         if item.table not in canonical:
+            continue
+        section_kind = sections.get(item.table, {}).get("kind")
+        if section_kind == "table":
+            # Skip row-level enforcement for tables here.
+            normalized.append(item)
+            seen.add((item.table, item.field))
             continue
         if field_labels.get(item.table) and item.field not in field_labels[item.table]:
             continue
@@ -170,12 +233,15 @@ def _normalize_missing_fields(
         normalized.append(item)
         seen.add((item.table, item.field))
 
-    for table, fields in canonical.items():
+    for table, value in canonical.items():
+        section_kind = sections.get(table, {}).get("kind")
+        if section_kind != "scalar_group":
+            continue
         labels = field_labels.get(table, {})
-        for field_name, value in fields.items():
+        for field_name, field_value in (value or {}).items():
             if (table, field_name) in seen:
                 continue
-            if value is None or (isinstance(value, str) and not value.strip()):
+            if field_value is None or (isinstance(field_value, str) and not field_value.strip()):
                 normalized.append(
                     MissingField(
                         table=table,
@@ -191,15 +257,13 @@ def _normalize_missing_fields(
 
 
 def _finalize_mapping(result: MappingResult) -> MappingResult:
-    canonical = _ensure_canonical_shape(result.mapped)
+    canonical = _ensure_canonical_shape(result.mapped or {})
     missing = _normalize_missing_fields(result.missing_fields or [], canonical)
     metadata = result.metadata or MappingMetadata()
     metadata.generated_at = datetime.utcnow()
     metadata.model_version = metadata.model_version or _schema_version()
-    table_labels = _table_labels()
-    field_labels = _field_labels()
-    metadata.table_labels = dict(table_labels)
-    metadata.field_labels = {table: dict(fields) for table, fields in field_labels.items()}
+    metadata.table_labels = dict(_table_labels())
+    metadata.field_labels = {table: dict(fields) for table, fields in _field_labels().items()}
     return MappingResult(mapped=canonical, missing_fields=missing, metadata=metadata)
 
 

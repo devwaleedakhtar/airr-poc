@@ -48,9 +48,9 @@ class MappingMetadata(BaseModel):
 
 
 class MappingResult(BaseModel):
-    mapped: Dict[str, Dict[str, Any]] = Field(
+    mapped: Dict[str, Any] = Field(
         default_factory=dict,
-        description="Canonical-shaped object keyed by table and field names",
+        description="Canonical-shaped object keyed by table name; values may be dicts or arrays depending on section kind",
     )
     missing_fields: List[MissingField] = Field(default_factory=list)
     metadata: MappingMetadata = Field(default_factory=MappingMetadata)

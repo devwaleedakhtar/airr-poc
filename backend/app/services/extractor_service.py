@@ -107,6 +107,20 @@ def _json_safe(text: str) -> Dict[str, Any]:
     return {}
 
 
+def _split_extraction_payload(payload: Dict[str, Any]) -> tuple[Dict[str, Any], Dict[str, Any] | None]:
+    """Support both legacy shape and new shape with confidences."""
+    if not isinstance(payload, dict):
+        return {}, None
+    # New shape: {extracted: {...}, confidences: {...}}
+    if "extracted" in payload:
+        return (
+            payload.get("extracted") or {},
+            payload.get("confidences") or payload.get("confidence") or None,
+        )
+    # Legacy: payload itself is extracted_json
+    return payload, None
+
+
 def _compute_confidences(data: Dict[str, Any]) -> Dict[str, Any]:
     # Simple heuristic confidences by presence
     result: Dict[str, Any] = {}
@@ -185,22 +199,23 @@ def extract_from_pdf(pdf_path: str) -> ExtractionResult:
         except Exception:
             pass
 
-    data = _json_safe(output or "{}")
+    payload = _json_safe(output or "{}")
+    extracted_json, model_confidences = _split_extraction_payload(payload)
     # Treat a completely empty/invalid JSON result as an error so the caller
     # surfaces a useful message instead of silently returning no data.
-    if not data:
+    if not extracted_json:
         snippet = (output or "")[:400]
         raise RuntimeError(
             f"Model returned no parsable JSON for this PDF. Raw output (truncated): {snippet}"
         )
 
-    confidences = _compute_confidences(data)
-    inferred_tables = [k for k in data.keys()]
+    confidences = model_confidences if model_confidences else _compute_confidences(extracted_json)
+    inferred_tables = [k for k in extracted_json.keys()]
     warnings: List[str] = []
-    snippets = _find_snippets(data, full_text)
+    snippets = _find_snippets(extracted_json, full_text)
 
     return ExtractionResult(
-        extracted_json=data,
+        extracted_json=extracted_json,
         confidences=confidences,
         inferred_tables=inferred_tables,
         warnings=warnings,

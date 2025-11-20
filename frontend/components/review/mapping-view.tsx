@@ -32,10 +32,13 @@ function isEmptyValue(value: JsonValue | undefined): boolean {
 
 function pruneMissing(
   missing: MissingField[],
-  mapped: Record<string, Record<string, JsonValue>>
+  mapped: Record<string, JsonValue>
 ): MissingField[] {
   return missing.filter((item) => {
-    const value = mapped?.[item.table]?.[item.field];
+    const tableVal = mapped?.[item.table];
+    // Only enforce missing for scalar groups (object maps), skip arrays
+    if (Array.isArray(tableVal)) return false;
+    const value = (tableVal as Record<string, JsonValue> | undefined)?.[item.field];
     return isEmptyValue(value);
   });
 }
@@ -74,10 +77,53 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
   const updateField = (table: string, field: string, value: JsonValue) => {
     setMapping((prev) => {
       if (!prev) return prev;
-      const nextTable = { ...(prev.mapped[table] ?? {}), [field]: value };
+      const baseTable = prev.mapped[table];
+      if (Array.isArray(baseTable)) {
+        // Coerce scalar edit into the first row for arrays if needed
+        const rows = baseTable.length > 0 ? baseTable.map((r) => (r && typeof r === "object" ? { ...(r as Record<string, JsonValue>) } : { value: r as JsonValue })) : [{}];
+        rows[0] = { ...rows[0], [field]: value };
+        const mapped = { ...prev.mapped, [table]: rows };
+        const missing = pruneMissing(prev.missing_fields, mapped);
+        return { ...prev, mapped, missing_fields: missing };
+      }
+      const nextTable = { ...(baseTable as Record<string, JsonValue> | undefined), [field]: value };
       const mapped = { ...prev.mapped, [table]: nextTable };
       const missing = pruneMissing(prev.missing_fields, mapped);
       return { ...prev, mapped, missing_fields: missing };
+    });
+    setDirty(true);
+  };
+
+  const updateTableCell = (table: string, rowIndex: number, column: string, value: JsonValue) => {
+    setMapping((prev) => {
+      if (!prev) return prev;
+      const existing = prev.mapped[table];
+      const rows: Array<Record<string, JsonValue>> = Array.isArray(existing)
+        ? existing.map((row) =>
+            row && typeof row === "object" && !Array.isArray(row) ? { ...(row as Record<string, JsonValue>) } : { value: row as JsonValue }
+          )
+        : [];
+      while (rows.length <= rowIndex) rows.push({});
+      rows[rowIndex] = { ...rows[rowIndex], [column]: value };
+      const mapped = { ...prev.mapped, [table]: rows };
+      const missing = pruneMissing(prev.missing_fields, mapped);
+      return { ...prev, mapped, missing_fields: missing };
+    });
+    setDirty(true);
+  };
+
+  const addTableRow = (table: string) => {
+    setMapping((prev) => {
+      if (!prev) return prev;
+      const existing = prev.mapped[table];
+      const rows: Array<Record<string, JsonValue>> = Array.isArray(existing)
+        ? existing.map((row) =>
+            row && typeof row === "object" && !Array.isArray(row) ? { ...(row as Record<string, JsonValue>) } : { value: row as JsonValue }
+          )
+        : [];
+      rows.push({});
+      const mapped = { ...prev.mapped, [table]: rows };
+      return { ...prev, mapped, missing_fields: pruneMissing(prev.missing_fields, mapped) };
     });
     setDirty(true);
   };
@@ -183,7 +229,7 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
 
         {mapping && (
           <Accordion type="multiple" className="rounded border divide-y">
-            {Object.entries(mapping.mapped).map(([tableName, fields]) => (
+            {Object.entries(mapping.mapped).map(([tableName, tableValue]) => (
               <AccordionItem key={tableName} value={tableName}>
                 <AccordionTrigger className="px-3 text-left">
                   <div className="flex flex-col text-left">
@@ -197,26 +243,102 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
                 </AccordionTrigger>
                 <AccordionContent className="px-3">
                   <div className="space-y-2">
-                    {Object.entries(fields).map(([fieldName, value]) => {
-                      const safeValue = (value === undefined ? "" : (value as JsonValue));
-                      const label = fieldLabels?.[tableName]?.[fieldName] ?? fieldName;
-                      return (
-                        <div
-                          key={`${tableName}.${fieldName}`}
-                          className="grid grid-cols-12 items-start gap-3"
-                        >
-                          <div className="col-span-4 space-y-1">
-                            <div className="font-medium text-sm break-words">{label}</div>
-                            {label !== fieldName && (
-                              <P className="text-xs text-muted-foreground break-all">{fieldName}</P>
-                            )}
-                          </div>
-                          <div className="col-span-8">
-                            <FieldEditor value={safeValue} onChange={(v) => updateField(tableName, fieldName, v)} />
-                          </div>
+                    {Array.isArray(tableValue) ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <P className="text-sm text-muted-foreground">
+                            {tableValue.length} row{tableValue.length === 1 ? "" : "s"}
+                          </P>
+                          <Button variant="outline" size="sm" onClick={() => addTableRow(tableName)}>
+                            Add row
+                          </Button>
                         </div>
-                      );
-                    })}
+                        <div className="overflow-auto rounded border">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="bg-muted/50 text-left">
+                                {(() => {
+                                  const labelLookup = fieldLabels?.[tableName] ?? {};
+                                  const rowKeys = new Set<string>();
+                                  tableValue.forEach((row) => {
+                                    if (row && typeof row === "object" && !Array.isArray(row)) {
+                                      Object.keys(row as Record<string, JsonValue>).forEach((k) => rowKeys.add(k));
+                                    }
+                                  });
+                                  const columns = [
+                                    ...Object.keys(labelLookup),
+                                    ...Array.from(rowKeys).filter((k) => !(labelLookup && labelLookup[k])),
+                                  ];
+                                  return columns.map((col) => (
+                                    <th key={col} className="px-3 py-2 border-b font-semibold">
+                                      {labelLookup[col] ?? col}
+                                    </th>
+                                  ));
+                                })()}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {tableValue.map((row, ri) => {
+                                const labelLookup = fieldLabels?.[tableName] ?? {};
+                                const rowKeys = new Set<string>();
+                                if (row && typeof row === "object" && !Array.isArray(row)) {
+                                  Object.keys(row as Record<string, JsonValue>).forEach((k) => rowKeys.add(k));
+                                }
+                                const columns = [
+                                  ...Object.keys(labelLookup),
+                                  ...Array.from(rowKeys).filter((k) => !(labelLookup && labelLookup[k])),
+                                ];
+                                return (
+                                  <tr key={`${tableName}-row-${ri}`} className="border-b last:border-b-0">
+                                    {columns.map((col) => {
+                                      const value =
+                                        row && typeof row === "object" && !Array.isArray(row)
+                                          ? (row as Record<string, JsonValue>)[col]
+                                          : row;
+                                      return (
+                                        <td key={`${tableName}-${ri}-${col}`} className="px-3 py-2 align-top">
+                                          <FieldEditor
+                                            value={value as JsonValue}
+                                            onChange={(v) => updateTableCell(tableName, ri, col, v)}
+                                          />
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : (
+                      (() => {
+                        const fields =
+                          tableValue && typeof tableValue === "object"
+                            ? (tableValue as Record<string, JsonValue>)
+                            : { value: tableValue as JsonValue };
+                        return Object.entries(fields).map(([fieldName, value]) => {
+                          const safeValue = value === undefined ? "" : (value as JsonValue);
+                          const label = fieldLabels?.[tableName]?.[fieldName] ?? fieldName;
+                          return (
+                            <div
+                              key={`${tableName}.${fieldName}`}
+                              className="grid grid-cols-12 items-start gap-3"
+                            >
+                              <div className="col-span-4 space-y-1">
+                                <div className="font-medium text-sm break-words">{label}</div>
+                                {label !== fieldName && (
+                                  <P className="text-xs text-muted-foreground break-all">{fieldName}</P>
+                                )}
+                              </div>
+                              <div className="col-span-8">
+                                <FieldEditor value={safeValue} onChange={(v) => updateField(tableName, fieldName, v)} />
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()
+                    )}
                   </div>
                 </AccordionContent>
               </AccordionItem>

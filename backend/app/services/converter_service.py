@@ -116,8 +116,10 @@ def _prepare_single_sheet_workbook(src_path: str, sheet_name: str) -> str:
     start = f"{get_column_letter(min_col)}{min_row}"
     end = f"{get_column_letter(max_col)}{max_row}"
     ws.print_area = f"{start}:{end}"
+    # Keep a single page but enlarge the canvas to avoid aggressive shrinking
+    ws.page_setup.paperSize = ws.PAPERSIZE_TABLOID  # 11x17 to preserve legibility
     ws.page_setup.fitToWidth = 1
-    ws.page_setup.fitToHeight = 0
+    ws.page_setup.fitToHeight = 1
     ws.page_setup.orientation = "landscape"
     if not ws.sheet_properties.pageSetUpPr:
         ws.sheet_properties.pageSetUpPr = PageSetupProperties()
@@ -161,7 +163,7 @@ def _convert_xlsx_to_pdf(xlsx_path: str) -> str:
         soffice,
         "--headless",
         "--convert-to",
-        "pdf:calc_pdf_Export",
+        "pdf:calc_pdf_Export:UseLosslessCompression=true,Quality=100,ReduceImageResolution=false",
         "--outdir",
         out_dir,
         xlsx_path,

@@ -4,22 +4,31 @@ Task: Look at a PDF of a single worksheet from a financial model and extract the
 Hard requirements (follow exactly):
 - Return STRICT JSON only. No explanations, no markdown, no comments.
 - Do NOT wrap the JSON in code fences (no ```json, no ```).
-- JSON shape MUST BE an object-of-objects representing sections/tables:
+- JSON shape MUST BE:
   {
-    "<Section Name>": {
-      "<field>": "<value>",
-      "...": "..."
+    "extracted": {
+      "<Section Name>": {
+        "<field>": "<value>",
+        "...": "..."
+      },
+      "...": { }
     },
-    "...": { }
+    "confidences": {
+      "<Section Name>": {
+        "<field>": "high|medium|low",
+        "...": "..."
+      },
+      "...": { }
+    }
   }
 - Preserve section structure: keep fields grouped under the same visual section/table as they appear on the sheet. Do NOT mix fields across visually distinct sections.
 - Section naming:
   - If a clear header or title is present above a group of fields, use it as the section name (trim whitespace and boilerplate).
   - If there is no explicit header, infer a concise, specific section name based on the majority of field labels in that group. Avoid generic names like "Table 1".
 - Multi-column tables:
-  - When a table has row labels in the first column and multiple value columns on the same rows, treat each row label as a single field.
-  - Choose one value column to represent that field (prefer the primary or leftmost value column that clearly applies) and use its displayed value as the field value.
-  - Do NOT attempt to encode multiple scenarios, roles, or columns for the same row into arrays or nested objects; each field must map to a single scalar value.
+  - When a table has row labels and multiple value columns on the same rows, create a separate field for EACH value column. Never merge columns into one value.
+  - Use the column header (and sub-header if present) in the field key. If a column header is missing, generate a positional name like "Column 1", "Column 2" (left to right) and include it in the field key.
+  - Each cell becomes one scalar value in JSON; do NOT use arrays/nesting for multiple columns, and do NOT concatenate values from multiple columns.
 - Field naming:
   - Preserve the original field label text as the key when it is readable; trim extra whitespace.
   - If the label contains repeated boilerplate, shorten it while keeping the meaning, but do not invent new concepts.
@@ -27,8 +36,16 @@ Hard requirements (follow exactly):
   - Extract the displayed cell value only (including units like "%", "Months", "Units" if shown).
   - If a value is blank or clearly not present, use an empty string.
   - All values MUST be valid JSON string values wrapped in double quotes, even if they are numeric or contain commas, percent signs, or other symbols (for example: "111,625", "13.6%").
-  - Do not invent fields or values.
+  - Do not invent fields or values. Never calculate, sum, average, normalize, or combine values across cells.
+  - Copy values verbatim exactly as shown (keep commas, dollar signs, percents, parentheses).
+- Column/sub-column discipline:
+  - Keep each column/sub-column separate. Do NOT merge multiple columns into one value (e.g., do not concatenate two percentages into a single string).
+  - If a column header is missing or ambiguous, generate a positional column name ("Column 1", "Column 2", "Column 3", ...) and keep each column as its own field.
+  - For tables with sub-headers, include the sub-header text in the field key when needed to keep values distinct.
+- Confidence labeling:
+  - For each field you return, also return a confidence: "high" if the value is directly read and unambiguous; "medium" if inferred/partially readable; "low" if unclear or blank.
+  - If a value is empty, set confidence to "low".
 
 Notes:
-- The output must be a single valid JSON object (not an array).
+- The output must be a single valid JSON object (not an array) with top-level keys: "extracted" and "confidences".
 - No code fences and no extra text.
