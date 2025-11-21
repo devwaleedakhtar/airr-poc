@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { mapSession, saveMapping } from "@/lib/api";
-import type { MappingResult, MissingField } from "@/types/mapping";
+import { exportWorkbook, mapSession, saveMapping } from "@/lib/api";
+import type { ExportResult, MappingResult, MissingField } from "@/types/mapping";
 import type { JsonValue } from "@/types/json";
 import { Button } from "@/components/ui/button";
 import { H1, H3, P } from "@/components/ui/typography";
@@ -16,8 +16,9 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import FieldEditor from "./field-editor";
+import ExportDialog from "./export-dialog";
 
 type Props = {
   sessionId: string;
@@ -28,6 +29,13 @@ function isEmptyValue(value: JsonValue | undefined): boolean {
   if (value === null || value === undefined) return true;
   if (typeof value === "string") return value.trim().length === 0;
   return false;
+}
+
+function formatLabel(label: string): string {
+  return label
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
 }
 
 function pruneMissing(
@@ -49,12 +57,16 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportResult, setExportResult] = useState<ExportResult | null>(null);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const tableLabels = mapping?.metadata?.table_labels ?? {};
   const fieldLabels = mapping?.metadata?.field_labels ?? {};
 
   const fetchMapping = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setMapping(null);
     try {
       const result = await mapSession(sessionId);
       setMapping(result);
@@ -105,6 +117,13 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
         : [];
       while (rows.length <= rowIndex) rows.push({});
       rows[rowIndex] = { ...rows[rowIndex], [column]: value };
+      // Ensure canonical columns stay visible: if field labels exist, add missing columns with empty string
+      const labelLookup = fieldLabels?.[table] ?? {};
+      Object.keys(labelLookup).forEach((col) => {
+        if (!(col in rows[rowIndex])) {
+          rows[rowIndex][col] = "";
+        }
+      });
       const mapped = { ...prev.mapped, [table]: rows };
       const missing = pruneMissing(prev.missing_fields, mapped);
       return { ...prev, mapped, missing_fields: missing };
@@ -158,12 +177,13 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
   }, {} as Record<string, MissingField[]>);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex-1">
-          <H1 className="text-2xl">Canonical Mapping</H1>
-          <P className="text-sm text-muted-foreground mt-1">
-            Review mapped values before exporting to the client schema.
+    <>
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex-1">
+            <H1 className="text-2xl">Canonical Mapping</H1>
+            <P className="text-sm text-muted-foreground mt-1">
+              Review mapped values before exporting to the client schema.
           </P>
           {mapping?.metadata?.generated_at && (
             <P className="text-xs text-muted-foreground mt-1.5">
@@ -177,12 +197,38 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
             onClick={fetchMapping}
             disabled={loading}
           >
+            {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             {loading ? "Running..." : "Regenerate Mapping"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              if (!mapping) return;
+              setExporting(true);
+              setError(null);
+              try {
+                const result = await exportWorkbook(sessionId);
+                setExportResult(result);
+                setShowExportDialog(true);
+                toast.success("Excel generated");
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : "Failed to generate Excel";
+                setError(msg);
+                toast.error("Export failed", { description: msg });
+              } finally {
+                setExporting(false);
+              }
+            }}
+            disabled={!mapping || exporting || loading}
+          >
+            {exporting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            {exporting ? "Generating..." : "Generate Excel"}
           </Button>
           <Button
             onClick={handleSave}
             disabled={!mapping || saving || !dirty}
           >
+            {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             {saving ? "Saving..." : "Save Mapping"}
           </Button>
         </div>
@@ -234,7 +280,7 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
                 <AccordionTrigger className="px-3 text-left">
                   <div className="flex flex-col text-left">
                     <span className="text-sm font-semibold break-words">
-                      {tableLabels?.[tableName] ?? tableName}
+                      {formatLabel(tableLabels?.[tableName] ?? tableName)}
                     </span>
                     {tableLabels?.[tableName] && (
                       <span className="text-xs text-muted-foreground break-all">{tableName}</span>
@@ -271,7 +317,7 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
                                   ];
                                   return columns.map((col) => (
                                     <th key={col} className="px-3 py-2 border-b font-semibold">
-                                      {labelLookup[col] ?? col}
+                                      {formatLabel(labelLookup[col] ?? col)}
                                     </th>
                                   ));
                                 })()}
@@ -319,7 +365,7 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
                             : { value: tableValue as JsonValue };
                         return Object.entries(fields).map(([fieldName, value]) => {
                           const safeValue = value === undefined ? "" : (value as JsonValue);
-                          const label = fieldLabels?.[tableName]?.[fieldName] ?? fieldName;
+                          const label = formatLabel(fieldLabels?.[tableName]?.[fieldName] ?? fieldName);
                           return (
                             <div
                               key={`${tableName}.${fieldName}`}
@@ -367,7 +413,13 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
           </div>
           <ScrollArea className="h-[600px]">
             <div className="p-4">
-              {unresolvedMissing.length === 0 ? (
+              {loading ? (
+                <div className="space-y-3 py-4">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : unresolvedMissing.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 mb-3">
                     <svg
@@ -400,7 +452,7 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
                       <AccordionTrigger className="px-3 py-2 hover:bg-red-50/50 transition-colors">
                         <div className="flex items-center gap-2 text-left w-full">
                           <span className="text-sm font-semibold text-red-900 flex-1">
-                            {tableLabels?.[tableName] ?? tableName}
+                            {formatLabel(tableLabels?.[tableName] ?? tableName)}
                           </span>
                           <Badge variant="destructive" className="bg-red-600">
                             {fields.length}
@@ -415,9 +467,11 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
                               className="text-sm p-2 rounded bg-red-50/50 border border-red-200"
                             >
                               <div className="font-medium text-red-900">
-                                {missing.field_label ??
-                                  fieldLabels?.[missing.table]?.[missing.field] ??
-                                  missing.field}
+                                {formatLabel(
+                                  missing.field_label ??
+                                    fieldLabels?.[missing.table]?.[missing.field] ??
+                                    missing.field
+                                )}
                               </div>
                               {missing.reason && (
                                 <P className="text-xs text-red-600 mt-1">{missing.reason}</P>
@@ -435,6 +489,15 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
         </div>
         </div>
       </div>
-    </div>
+      </div>
+      {exportResult && (
+        <ExportDialog
+          open={showExportDialog}
+          onOpenChange={setShowExportDialog}
+          exportResult={exportResult}
+          sessionId={sessionId}
+        />
+      )}
+    </>
   );
 }

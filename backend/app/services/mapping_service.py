@@ -267,12 +267,44 @@ def _finalize_mapping(result: MappingResult) -> MappingResult:
     return MappingResult(mapped=canonical, missing_fields=missing, metadata=metadata)
 
 
+def _json_safe(text: str) -> Dict[str, Any]:
+    """Parse JSON from model content with fallbacks for empty/garbage."""
+
+    def try_parse(payload: str) -> Dict[str, Any] | None:
+        try:
+            return json.loads(payload)
+        except Exception:
+            return None
+
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return {}
+
+    parsed = try_parse(cleaned)
+    if parsed is not None:
+        return parsed
+
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        candidate = cleaned[start : end + 1]
+        parsed = try_parse(candidate)
+        if parsed is not None:
+            return parsed
+
+    return {}
+
+
 def map_to_canonical(source_json: Dict[str, Any]) -> MappingResult:
     if not source_json:
         raise ValueError("Source JSON is empty; cannot perform mapping.")
 
     prompt = _build_prompt(source_json)
-    client = OpenAI(api_key=settings.model_api_key)
+    client = OpenAI(
+        api_key=settings.model_api_key,
+        base_url=settings.model_base_url,
+        default_headers=settings.model_extra_headers,
+    )
     response = client.chat.completions.create(
         model=settings.model_name,
         temperature=0.0,
@@ -286,11 +318,16 @@ def map_to_canonical(source_json: Dict[str, Any]) -> MappingResult:
         ],
     )
     content = response.choices[0].message.content if response.choices else "{}"
+    payload = _json_safe(content or "{}")
+    if not payload:
+        snippet = (content or "")[:400]
+        raise ValueError(f"Model returned no parsable JSON for mapping. Raw output (truncated): {snippet}")
+
     try:
-        parsed = MappingResult.model_validate_json(content or "{}")
+        parsed = MappingResult.model_validate(payload)
     except ValidationError:
-        data = json.loads(content or "{}")
-        parsed = MappingResult.model_validate(data)
+        # As final fallback, try model_validate_json on raw content to surface a better message
+        parsed = MappingResult.model_validate_json(content or "{}")
 
     return _finalize_mapping(parsed)
 

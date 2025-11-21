@@ -8,6 +8,18 @@ from pydantic import BaseModel, Field
 from .mapping import MappingResult
 
 
+class ExportAppliedField(BaseModel):
+    table: str
+    field: str
+    cell: str
+    value: Any | None = None
+
+
+class ExportResponse(BaseModel):
+    download_url: str
+    applied_fields: list[ExportAppliedField] = Field(default_factory=list)
+
+
 class SessionModel(BaseModel):
     id: str = Field(..., alias="_id")
     workbook_id: str

@@ -8,13 +8,10 @@ class Settings(BaseSettings):
     mongo_uri: str = Field(..., alias="MONGO_URI")
     model_name: str = Field(..., alias="MODEL_NAME")
     model_api_key: str = Field(..., alias="MODEL_API_KEY")
+    model_base_url: str = Field(default="https://api.openai.com/v1", alias="OPENAI_BASE_URL")
+    model_extra_headers: dict[str, str] | None = Field(default=None, alias="MODEL_EXTRA_HEADERS")
 
     # OpenAI base URL by default; override via OPENAI_BASE_URL for alternatives (e.g., Gemini-compatible proxy)
-    openai_base_url: str = Field(
-        default="https://api.openai.com/v1",
-        alias="OPENAI_BASE_URL",
-    )
-
     # Cloudinary
     cloudinary_url: str | None = Field(default=None, alias="CLOUDINARY_URL")
     cloudinary_api_key: str | None = Field(default=None, alias="CLOUDINARY_API_KEY")

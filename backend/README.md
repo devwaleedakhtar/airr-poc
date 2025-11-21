@@ -15,9 +15,10 @@ Environment
 
 Required variables
 - MONGO_URI=mongodb://localhost:27017/airr_poc
-- MODEL_NAME=gpt-4o-2024-08-06 (or your chosen OpenAI model)
-- MODEL_API_KEY=YOUR_OPENAI_API_KEY
-- OPENAI_BASE_URL=https://api.openai.com/v1 (default; override only if using a proxy/alt provider)
+- MODEL_NAME=gpt-4o-2024-08-06 (or your chosen model)
+- MODEL_API_KEY=YOUR_MODEL_API_KEY
+- OPENAI_BASE_URL=https://api.openai.com/v1 (default OpenAI; set to https://openrouter.ai/api/v1 for OpenRouter)
+- MODEL_EXTRA_HEADERS={"HTTP-Referer":"https://your-site.com","X-Title":"AIRR POC"} (optional; useful for OpenRouter)
 - CLOUDINARY_URL=cloudinary://KEY:SECRET@CLOUD_NAME
 - CLOUDINARY_BASE_FOLDER=airr-poc
 - LIBREOFFICE_PATH=optional-full-path-to-soffice

@@ -106,7 +106,9 @@ export default function UploadForm() {
       </div>
 
       {progressStep && (
-        <ProgressIndicator currentStep={progressStep} className="my-8" />
+        <div className="flex items-center justify-center py-16">
+          <ProgressIndicator currentStep={progressStep} className="w-full max-w-2xl" />
+        </div>
       )}
 
       {!isProcessing && (

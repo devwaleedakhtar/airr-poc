@@ -25,3 +25,15 @@ export type MappingResult = {
   missing_fields: MissingField[];
   metadata: MappingMetadata;
 };
+
+export type ExportAppliedField = {
+  table: string;
+  field: string;
+  cell: string;
+  value: unknown;
+};
+
+export type ExportResult = {
+  download_url: string;
+  applied_fields: ExportAppliedField[];
+};
