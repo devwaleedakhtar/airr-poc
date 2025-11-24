@@ -1,0 +1,569 @@
+{
+  "project_overview": {
+    "property_name": "555 Main Street, Santa Barbara, CA",
+    "key_metrics": {
+      "levered_irr": "13.6%",
+      "equity_multiple": "2.35x",
+      "net_profit": "$19,102,999"
+    }
+  },
+  "carry_costs": {
+    "capitalized_construction_interest": {
+      "pasted_values": 1157333,
+      "formula": 1157333
+    },
+    "mezzanine_loan": {
+      "pasted_values": 0,
+      "formula": 0
+    },
+    "mezzanine_loan_fees": {
+      "pasted_values": 0,
+      "formula": 0
+    },
+    "construction_loan_fees": {
+      "pasted_values": 208728,
+      "formula": 208728
+    },
+    "circuit_breaker_operating_shortfall": {
+      "pasted_values": 71549,
+      "formula": 71549
+    },
+    "on_off": "Off"
+  },
+  "property_details": {
+    "number_of_units": 145,
+    "number_of_buildings": 10,
+    "net_rentals_sf": 111625,
+    "average_unit_size_sf": 770,
+    "net_acres": 9.5,
+    "units_per_acre": 15.26,
+    "street_address": "555 Main Street",
+    "city_state_zip": "Santa Barbara, CA",
+    "currency": "USD"
+  },
+  "stabilized_rents": {
+    "unit_mix": [
+      {
+        "number_of_units": 50,
+        "unit_type": "1BR/1BA",
+        "sf": 600,
+        "rent_per_month": "$1,425",
+        "rent_per_sf": "$2.38"
+      },
+      {
+        "number_of_units": 20,
+        "unit_type": "2BR/1BA",
+        "sf": 725,
+        "rent_per_month": "$1,600",
+        "rent_per_sf": "$2.21"
+      },
+      {
+        "number_of_units": 65,
+        "unit_type": "2BR/2BA",
+        "sf": 875,
+        "rent_per_month": "$1,875",
+        "rent_per_sf": "$2.14"
+      },
+      {
+        "number_of_units": 10,
+        "unit_type": "3BR/2BA",
+        "sf": 1025,
+        "rent_per_month": "$2,100",
+        "rent_per_sf": "$2.05"
+      }
+    ],
+    "totals": {
+      "units": 145,
+      "sf": 770,
+      "rent_per_month": "$1,697",
+      "rent_per_sf": "$2.20"
+    }
+  },
+  "construction_financing": {
+    "amount": {
+      "construction_loan_amount": "$20,872,774",
+      "loan_to_cost_ltc": "60%",
+      "fixed_or_floating_rate": "Floating-Rate",
+      "fixed_rate_interest_rate_spread": "3.00%",
+      "loan_fee_as_percentage_of_proceeds": "1.00%",
+      "terms": "24 Month(s)"
+    },
+    "sources_of_funds": {
+      "equity": "$13,915,182.72",
+      "mezzanine_loan": "$0",
+      "construction_loan": "$20,872,774",
+      "total": "$34,787,957"
+    },
+    "uses_of_funds": {
+      "land_acquisition_costs": "$10,000,000",
+      "closing_costs": "$100,000",
+      "hard_costs": "$19,350,000",
+      "soft_costs": "$1,786,679",
+      "contingency": "$2,113,668",
+      "capitalized_construction_interest": "$1,157,333",
+      "mezzanine_capitalized_interest": "$0",
+      "construction_loan_fees": "$208,728",
+      "operating_expense_shortfalls": "$71,549",
+      "total": "$34,787,957"
+    }
+  },
+  "land_acquisition_information": {
+    "land_acquisition_price": "$10,000,000",
+    "land_price_per_acre": "$1,052,632",
+    "land_price_per_sf": "$24",
+    "closing_costs_percent_of_land_price": "1.00%",
+    "closing_costs": "$100,000",
+    "land_closing_date": "2/24/2024"
+  },
+  "lease_up_information": {
+    "lease_up_period_begins": "Month 14",
+    "property_stabilization": "Month 32",
+    "lease_up_period": "18 Month(s)"
+  },
+  "stabilized_other_income": {
+    "items": [
+      {
+        "item": "Laundry Income",
+        "per_unit_per_month": "$10",
+        "per_month": "$1,450",
+        "per_year": "$17,400"
+      },
+      {
+        "item": "Late Fees",
+        "per_unit_per_month": "$3",
+        "per_month": "$435",
+        "per_year": "$5,220"
+      },
+      {
+        "item": "Pet Rent",
+        "per_unit_per_month": "$15",
+        "per_month": "$2,175",
+        "per_year": "$26,100"
+      },
+      {
+        "item": "Pet Fees",
+        "per_unit_per_month": "$5",
+        "per_month": "$725",
+        "per_year": "$8,700"
+      },
+      {
+        "item": "Garage Income",
+        "per_unit_per_month": "$50",
+        "per_month": "$7,250",
+        "per_year": "$87,000"
+      },
+      {
+        "item": "Storage Income",
+        "per_unit_per_month": "$0",
+        "per_month": "$0",
+        "per_year": "$0"
+      },
+      {
+        "item": "Other Charges",
+        "per_unit_per_month": "$0",
+        "per_month": "$0",
+        "per_year": "$0"
+      },
+      {
+        "item": "Other Charges",
+        "per_unit_per_month": "$0",
+        "per_month": "$0",
+        "per_year": "$0"
+      },
+      {
+        "item": "Other Charges",
+        "per_unit_per_month": "$0",
+        "per_month": "$0",
+        "per_year": "$0"
+      },
+      {
+        "item": "Other Charges",
+        "per_unit_per_month": "$0",
+        "per_month": "$0",
+        "per_year": "$0"
+      },
+      {
+        "item": "Other Charges",
+        "per_unit_per_month": "$0",
+        "per_month": "$0",
+        "per_year": "$0"
+      },
+      {
+        "item": "Other Charges",
+        "per_unit_per_month": "$0",
+        "per_month": "$0",
+        "per_year": "$0"
+      }
+    ],
+    "total": {
+      "per_unit_per_month": "$83",
+      "per_month": "$12,035",
+      "per_year": "$144,420"
+    }
+  },
+  "permanent_financing_information": {
+    "month": "Month 24",
+    "loan_amount": "$23,939,952",
+    "noi_at_permanent_refinancing_month": "$2,074,796",
+    "cap_rate_used_for_valuation": "6.50%",
+    "loan_to_value": "75.00%",
+    "going_debt_service_cover_ratio": "1.29x",
+    "going_in_debt_yield": "8.67%",
+    "fixed_or_floating_rate": "Floating-Rate",
+    "fixed_rate_interest_rate_spread": "2.00%",
+    "interest_only_period": "12 Month(s)",
+    "loan_fee_as_percentage_of_proceeds": "1.00%",
+    "amortization": "360 Month(s)",
+    "term": "96 Month(s)",
+    "refinance_permanent_debt": "N"
+  },
+  "total_costs_details": {
+    "total_project_cost": "$34,787,957",
+    "total_project_cost_per_unit": "$239,917",
+    "stabilized_return_on_cost": "6.93%",
+    "cost_per_sf": "$311.650"
+  },
+  "refinancing_debt_information": {
+    "refinance_month": "Month 60",
+    "noi_used": "Trailing 12-month",
+    "noi_at_permanent_refinancing_month": "$2,527,673",
+    "loan_amount_refinance": "$25,276,726",
+    "cap_rate_used_for_valuation": "6.50%",
+    "loan_to_value": "65.00%",
+    "going_debt_service_cover_ratio": "1.33x",
+    "going_in_debt_yield": "10.00%",
+    "fixed_or_floating_rate": "Floating-Rate",
+    "fixed_rate_interest_rate_spread": "2.80%",
+    "interest_only_period": "6 Month(s)",
+    "origination_loan_fee_as_percentage_of_proceeds": "1.00%",
+    "exit_fee": "0.50%",
+    "amortization": "360 Month(s)",
+    "term": "120 Month(s)"
+  },
+  "mezzanine_construction_loan": {
+    "mezzanine_debt": "N",
+    "mezzanine_loan_to_cost_ltc_ratio": "10.00%",
+    "mezzanine_cash_interest_rate": "2.00%",
+    "mezzanine_pik_interest_rate": "8.00%",
+    "mezzanine_origin_fee": "1.00%",
+    "mezzanine_amortization_period": "N/A",
+    "mezzanine_maturity": "10 Year(s)",
+    "loan": "$3,478,796"
+  },
+  "sales_details": {
+    "sales_prices": "$47,863,254",
+    "sales_price_per_unit": "$330,091",
+    "cost_of_sale": "$478,633",
+    "closing_costs_as_percent_sale_price": "1.00%",
+    "exist_cap_rate": "6.00%",
+    "hold_period": "96 Month(s)"
+  },
+  "equity_structure": {
+    "gp_equity": "5%",
+    "lp_equity": "95%"
+  },
+  "vacancy_and_loss_assumptions": {
+    "physical_vacancy": {
+      "year_1": "0.00%",
+      "year_2": "0.00%",
+      "year_3": "3.00%",
+      "year_4": "3.00%",
+      "year_5_plus": "3.00%"
+    },
+    "bad_debt": {
+      "year_1": "1.00%",
+      "year_2": "1.00%",
+      "year_3": "1.00%",
+      "year_4": "1.00%",
+      "year_5_plus": "1.00%"
+    },
+    "concessions": {
+      "year_1": "8.00%",
+      "year_2": "4.00%",
+      "year_3": "0.50%",
+      "year_4": "0.50%",
+      "year_5_plus": "0.50%"
+    },
+    "other_loss": {
+      "year_1": "0.00%",
+      "year_2": "0.00%",
+      "year_3": "0.00%",
+      "year_4": "0.00%",
+      "year_5_plus": "0.00%"
+    }
+  },
+  "growth_rates": {
+    "annual_market_rent_growth": {
+      "year_1": "2.20%",
+      "year_2": "2.30%",
+      "year_3": "2.40%",
+      "year_4": "2.50%",
+      "year_5_plus": "2.60%"
+    },
+    "other_income_growth": {
+      "year_1": "3.00%",
+      "year_2": "3.00%",
+      "year_3": "3.00%",
+      "year_4": "3.00%",
+      "year_5_plus": "3.00%"
+    }
+  },
+  "waterfall_structure": {
+    "number_of_tiers": "4 tiers",
+    "tiers": [
+      {
+        "tier": "Preferred Return",
+        "hurdle_return": "8.00%",
+        "gp_promote": "0.00%",
+        "gp_cash_flow": "5.00%",
+        "lp_cash_flow": "95.00%"
+      },
+      {
+        "tier": "Hurdle #2",
+        "hurdle_return": "10.00%",
+        "gp_promote": "15.79%",
+        "gp_cash_flow": "20.00%",
+        "lp_cash_flow": "80.00%"
+      },
+      {
+        "tier": "Hurdle #3",
+        "hurdle_return": "15.00%",
+        "gp_promote": "26.32%",
+        "gp_cash_flow": "30.00%",
+        "lp_cash_flow": "70.00%"
+      },
+      {
+        "tier": "Hurdle #4",
+        "hurdle_return": null,
+        "gp_promote": "47.37%",
+        "gp_cash_flow": "50.00%",
+        "lp_cash_flow": "50.00%"
+      }
+    ]
+  },
+  "expenses_section": {
+    "line_items": [
+      {
+        "item": "Payroll",
+        "dollars_per_unit_per_year": 1500,
+        "total": 217500,
+        "percent_fixed": "100%"
+      },
+      {
+        "item": "General & Administrative",
+        "dollars_per_unit_per_year": 300,
+        "total": 43500,
+        "percent_fixed": "100%"
+      },
+      {
+        "item": "Marketing Expenses",
+        "dollars_per_unit_per_year": 250,
+        "total": 36250,
+        "percent_fixed": "100%"
+      },
+      {
+        "item": "Repairs & Maintenance",
+        "dollars_per_unit_per_year": 500,
+        "total": 72500,
+        "percent_fixed": "90%"
+      },
+      {
+        "item": "Turnover Costs",
+        "dollars_per_unit_per_year": 300,
+        "total": 43500,
+        "percent_fixed": "0%"
+      },
+      {
+        "item": "Contract Services",
+        "dollars_per_unit_per_year": 150,
+        "total": 21750,
+        "percent_fixed": "100%"
+      },
+      {
+        "item": "Utilities",
+        "dollars_per_unit_per_year": 500,
+        "total": 72500,
+        "percent_fixed": "25%"
+      },
+      {
+        "item": "Utility Bill-Back",
+        "dollars_per_unit_per_year": -400,
+        "total": -58000,
+        "percent_fixed": "0%"
+      },
+      {
+        "item": "Insurance",
+        "dollars_per_unit_per_year": 400,
+        "total": 58000,
+        "percent_fixed": "100%"
+      },
+      {
+        "item": "Other Costs",
+        "dollars_per_unit_per_year": null,
+        "total": null,
+        "percent_fixed": null
+      },
+      {
+        "item": "Other Costs",
+        "dollars_per_unit_per_year": null,
+        "total": null,
+        "percent_fixed": null
+      },
+      {
+        "item": "Other Costs",
+        "dollars_per_unit_per_year": null,
+        "total": null,
+        "percent_fixed": null
+      }
+    ],
+    "total": {
+      "dollars_per_unit_per_year": 3500,
+      "total": 507500,
+      "percent_fixed": "91%"
+    }
+  },
+  "expenses_growth_management_fee_and_reserve": {
+    "annual_expense_growth_rate": "2.00%",
+    "capital_reserve_expense_per_unit": 300,
+    "management_fee": "3.00%"
+  },
+  "return_metrics": {
+    "unlevered_irr": "9.9%",
+    "unlevered_equity_multiple": "1.87x",
+    "levered_irr": "13.62%",
+    "levered_equity_multiple": "2.35x",
+    "net_profit_levered_cf": "$19,102,999",
+    "lp_irr": "12.53%",
+    "gp_irr": "26.50%",
+    "lp_equity_multiple": "2.19x",
+    "gp_equity_multiple": "5.42x"
+  },
+  "property_tax_information": {
+    "millage_rate": "1.20%",
+    "tax_reassessed_upon_sale": "Yes",
+    "percentage_of_value_assessed": "100%"
+  },
+  "property_taxes_and_fixed_charges_schedule": {
+    "growth_rates": {
+      "property_taxes": [
+        {
+          "year": "Year 1",
+          "growth_rate": "50.00%",
+          "amount": 50000
+        },
+        {
+          "year": "Year 2",
+          "growth_rate": "50.00%",
+          "amount": 75000
+        },
+        {
+          "year": "Year 3",
+          "growth_rate": "3.00%",
+          "amount": 112500
+        },
+        {
+          "year": "Year 4",
+          "growth_rate": "2.00%",
+          "amount": 115875
+        },
+        {
+          "year": "Year 5",
+          "growth_rate": "2.00%",
+          "amount": 118193
+        },
+        {
+          "year": "Year 6",
+          "growth_rate": "2.00%",
+          "amount": 120556
+        },
+        {
+          "year": "Year 7",
+          "growth_rate": "2.00%",
+          "amount": 122967
+        },
+        {
+          "year": "Year 8",
+          "growth_rate": "2.00%",
+          "amount": 125427
+        },
+        {
+          "year": "Year 9",
+          "growth_rate": "2.00%",
+          "amount": 127935
+        },
+        {
+          "year": "Year 10",
+          "growth_rate": "2.00%",
+          "amount": 130494
+        },
+        {
+          "year": "Year 11+",
+          "growth_rate": "2.00%",
+          "amount": 133104
+        }
+      ],
+      "fixed_charge": [
+        {
+          "year": "Year 1",
+          "growth_rate": "50.00%",
+          "amount": 5000
+        },
+        {
+          "year": "Year 2",
+          "growth_rate": "50.00%",
+          "amount": 7500
+        },
+        {
+          "year": "Year 3",
+          "growth_rate": "3.00%",
+          "amount": 11250
+        },
+        {
+          "year": "Year 4",
+          "growth_rate": "2.00%",
+          "amount": 11588
+        },
+        {
+          "year": "Year 5",
+          "growth_rate": "2.00%",
+          "amount": 11819
+        },
+        {
+          "year": "Year 6",
+          "growth_rate": "2.00%",
+          "amount": 12056
+        },
+        {
+          "year": "Year 7",
+          "growth_rate": "2.00%",
+          "amount": 12297
+        },
+        {
+          "year": "Year 8",
+          "growth_rate": "2.00%",
+          "amount": 12543
+        },
+        {
+          "year": "Year 9",
+          "growth_rate": "2.00%",
+          "amount": 12794
+        },
+        {
+          "year": "Year 10",
+          "growth_rate": "2.00%",
+          "amount": 13049
+        },
+        {
+          "year": "Year 11+",
+          "growth_rate": "2.00%",
+          "amount": 13310
+        }
+      ]
+    }
+  },
+  "effect_of_holding_period_and_exit_cap_table": {
+    "base_metrics": "13.6% / 2.35x",
+    "exit_cap_rates": ["8.50%", "8.00%", "7.50%", "7.00%", "6.50%", "6.00%"],
+    "holding_periods_months": [36, 48, 60, 72, 84, 96, 108, 120]
+  }
+}

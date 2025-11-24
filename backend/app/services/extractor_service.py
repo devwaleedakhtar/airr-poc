@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
 import re
+from dataclasses import dataclass
+from typing import Any, Dict, List
 
 from openai import OpenAI
 from pypdf import PdfReader
@@ -20,15 +20,23 @@ class ExtractionResult:
     text_snippets: Dict[str, str] | None
 
 
-def _read_pdf_text(path: str) -> str:
+def _read_pdf_text(path: str, max_chars: int = 100_000) -> str:
     reader = PdfReader(path)
-    texts = []
+    texts: list[str] = []
     for page in reader.pages:
         try:
+            if len(texts) >= max_chars:
+                break
             texts.append(page.extract_text() or "")
         except Exception:
             pass
-    return "\n".join(texts)
+        if sum(len(t) for t in texts) >= max_chars:
+            break
+    # Truncate to max_chars to avoid oversized prompts.
+    full = "\n".join(texts)
+    if len(full) > max_chars:
+        return full[:max_chars]
+    return full
 
 
 def _load_base_prompt() -> str:
@@ -107,13 +115,46 @@ def _json_safe(text: str) -> Dict[str, Any]:
     return {}
 
 
+def _split_extraction_payload(payload: Dict[str, Any]) -> tuple[Dict[str, Any], Dict[str, Any] | None]:
+    """Support both legacy shape and new shape with confidences."""
+    if not isinstance(payload, dict):
+        return {}, None
+    if "extracted" in payload:
+        return payload.get("extracted") or {}, payload.get("confidences") or payload.get("confidence") or None
+    return payload, None
+
+
 def _compute_confidences(data: Dict[str, Any]) -> Dict[str, Any]:
-    # Simple heuristic confidences by presence
+    # Heuristic confidences: start at "medium", downgrade blanks, upgrade simple numerics, flag out-of-range percents.
     result: Dict[str, Any] = {}
+
+    def rate(value: Any) -> str:
+        if value is None:
+            return "low"
+        text = str(value).strip()
+        if text == "":
+            return "low"
+        percent_match = re.match(r"^-?\d+(\.\d+)?%$", text)
+        if percent_match:
+            try:
+                num = float(text.rstrip("%"))
+                if num < -5 or num > 150:
+                    return "low"
+            except Exception:
+                return "low"
+            return "medium"
+        # numeric-ish tokens
+        try:
+            float(text.replace(",", ""))
+            return "medium"
+        except Exception:
+            pass
+        return "medium"
+
     for table, kv in data.items():
         if not isinstance(kv, dict):
             continue
-        result[table] = {k: ("high" if (v is not None and str(v).strip()) else "low") for k, v in kv.items()}
+        result[table] = {k: rate(v) for k, v in kv.items()}
     return result
 
 
@@ -144,63 +185,50 @@ def _find_snippets(data: Dict[str, Any], full_text: str, window: int = 80) -> Di
 def extract_from_pdf(pdf_path: str) -> ExtractionResult:
     base_prompt = _load_base_prompt()
     full_text = _read_pdf_text(pdf_path)
-    # If the PDF has no extractable text at all, fail fast so the client
-    # sees a clear error instead of an empty extraction.
     if not full_text.strip():
         raise RuntimeError(
             "PDF contains no extractable text; ensure the sheet exports as a text-based PDF (not an image-only scan)."
         )
 
-    client = OpenAI(api_key=settings.model_api_key)
+    # Build chat messages with inlined PDF text. This works across OpenAI and OpenRouter.
+    messages = [
+        {
+            "role": "system",
+            "content": "You are a precise data extraction engine.",
+        },
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": base_prompt},
+                {"type": "text", "text": "PDF TEXT:\n" + full_text},
+            ],
+        },
+    ]
 
-    with open(pdf_path, "rb") as f:
-        uploaded = client.files.create(file=f, purpose="assistants")
-
-    system_prompt = "You are a precise data extraction engine.\n\n" + base_prompt
-
-    response = client.responses.create(
+    client = OpenAI(api_key=settings.model_api_key, base_url=settings.model_base_url, default_headers=settings.model_extra_headers)
+    response = client.chat.completions.create(
         model=settings.model_name,
-        input=[
-            {
-                "role": "system",
-                "content": [
-                    {"type": "input_text", "text": system_prompt},
-                ],
-            },
-            {
-                "role": "user",
-                "content": [
-                    {"type": "input_file", "file_id": uploaded.id},
-                ],
-            },
-        ],
         temperature=0.0,
+        messages=messages,
     )
 
-    try:
-        output = response.output[0].content[0].text if response.output else "{}"
-    finally:
-        try:
-            client.files.delete(uploaded.id)
-        except Exception:
-            pass
+    output = response.choices[0].message.content if response.choices else "{}"
 
-    data = _json_safe(output or "{}")
-    # Treat a completely empty/invalid JSON result as an error so the caller
-    # surfaces a useful message instead of silently returning no data.
-    if not data:
+    payload = _json_safe(output or "{}")
+    extracted_json, model_confidences = _split_extraction_payload(payload)
+    if not extracted_json:
         snippet = (output or "")[:400]
         raise RuntimeError(
             f"Model returned no parsable JSON for this PDF. Raw output (truncated): {snippet}"
         )
 
-    confidences = _compute_confidences(data)
-    inferred_tables = [k for k in data.keys()]
+    confidences = model_confidences if model_confidences else _compute_confidences(extracted_json)
+    inferred_tables = [k for k in extracted_json.keys()]
     warnings: List[str] = []
-    snippets = _find_snippets(data, full_text)
+    snippets = _find_snippets(extracted_json, full_text)
 
     return ExtractionResult(
-        extracted_json=data,
+        extracted_json=extracted_json,
         confidences=confidences,
         inferred_tables=inferred_tables,
         warnings=warnings,

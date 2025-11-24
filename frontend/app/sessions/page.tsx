@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 export default async function SessionsPage() {
   const sessions = await listSessions();
   return (
-    <main className="mx-auto max-w-4xl py-10 px-4 space-y-4">
+    <div className="space-y-4">
       <H1>Sessions</H1>
       {sessions.length === 0 ? (
         <P>No sessions yet.</P>
@@ -29,7 +29,7 @@ export default async function SessionsPage() {
           ))}
         </ul>
       )}
-    </main>
+    </div>
   );
 }
 

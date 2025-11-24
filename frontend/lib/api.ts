@@ -11,7 +11,7 @@ import type {
   ExtractedJson,
   Confidences,
 } from "@/types/extraction";
-import type { MappingResult } from "@/types/mapping";
+import type { ExportResult, MappingResult } from "@/types/mapping";
 
 export type ExtractResponse = {
   session_id: string;
@@ -130,6 +130,14 @@ export async function saveMapping(sessionId: string, mapping: MappingResult): Pr
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(mapping),
+  });
+  return json(res);
+}
+
+export async function exportWorkbook(sessionId: string): Promise<ExportResult> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/export`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
   });
   return json(res);
 }

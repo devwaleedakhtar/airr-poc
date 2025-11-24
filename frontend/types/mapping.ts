@@ -1,6 +1,6 @@
 import type { JsonValue } from "./json";
 
-export type CanonicalMapping = Record<string, Record<string, JsonValue>>;
+export type CanonicalMapping = Record<string, JsonValue>;
 
 export type MissingField = {
   table: string;
@@ -24,4 +24,16 @@ export type MappingResult = {
   mapped: CanonicalMapping;
   missing_fields: MissingField[];
   metadata: MappingMetadata;
+};
+
+export type ExportAppliedField = {
+  table: string;
+  field: string;
+  cell: string;
+  value: unknown;
+};
+
+export type ExportResult = {
+  download_url: string;
+  applied_fields: ExportAppliedField[];
 };

@@ -1,760 +1,1559 @@
-tables:
-  - name: asset_management_model_start
-    label: "Asset Management Model Start"
-    description: Anchor dates for when the asset management module begins.
-    fields:
-      actuals_through:
-        label: "Actuals Through"
-        aliases: ["Actuals Thru", "Historical Actuals Through"]
-        type: date
-        description: Last calendar date through which historical operating actuals are included.
-      am_model_start_date:
-        label: "Date AM Model Starts"
-        aliases: ["AM Start Date", "Asset Mgmt Start Date"]
-        type: date
-        description: Calendar date on which the asset-management (AM) projection period begins.
-      am_model_start_month_index:
-        label: "Month AM Model Starts"
-        aliases:
-          ["AM Start Month", "Asset Mgmt Start Month", "AM Model Start Month"]
-        type: integer
-        description: Month index (relative to project timeline) corresponding to the AM model start.
+model_schema:
+  name: "perpetuity_underwriting_model"
+  version: "0.1"
+  description: >
+    Canonical schema for mapping semi-structured underwriting models into the
+    Perpetuity Excel model.  It defines scalar inputs and repeatable tables
+    (unit mix, other income, waterfall, expenses, loan terms, sources & uses,
+    tax assumptions, etc.).  LLMs should use aliases and descriptions to map
+    arbitrary workbook labels into these canonical fields.  Some fields are
+    marked as calculated_output or ignored so the AI knows which values it
+    does NOT need to search for or populate.
 
-  - name: construction_and_delivery_schedule
-    label: "Construction and Delivery Schedule"
-    description: Key dates and month indexes for construction, completion, and unit delivery.
+  # --------------------------------------------------------------------------
+  # GLOBAL CONVENTIONS
+  # --------------------------------------------------------------------------
+  conventions:
+    percent_fields:
+      storage: "percentage_points"          # 2.5 == 2.5%
+    currency_fields:
+      currency: "USD"
+      storage: "absolute_dollars"
+    duration_fields:
+      units_note: "duration fields specify the number of months or years"
+    roles:
+      - input               # AI must map/populate from source model
+      - derived_input       # can be computed from other mapped fields
+      - calculated_output   # calculated by the client model; AI MAY read but not set
+      - ignore              # AI should not search for or attempt to map
+
+  # --------------------------------------------------------------------------
+  # SECTION: UNIT MIX
+  # --------------------------------------------------------------------------
+  unit_mix:
+    kind: "table"
+    description: >
+      The aggregate mix of unit types in an apartment building project.
+      The column structure is always the same, but unit type NAMES vary
+      by analyst (e.g. "1BR/1BA", "A1 (1BR)", "1 BEDROOM + DEN").
+      AI should map rows by semantic similarity / beds-baths where possible.
+      Preserve the original source row label in `original_label` when
+      the label does not exactly match a canonical type.
+    row_key_field: "unit_type"
+    row_match_strategy: "semantic_label"
+    columns:
+      unit_type:
+        label: "Unit Type"
+        aliases:
+          - "Floorplan"
+          - "Type"
+        dtype: "string"
+        role: "input"
+        required: true
+        description: >
+          Each unit type/floorplan, typically expressed in terms of beds and baths.
+        example_values:
+          - "Studio"
+          - "1 Bed / 1 Bath"
+          - "2BR/2BA"
+          - "A0 (1BR)"
+
+      num_units:
+        label: "# of Units"
+        aliases:
+          - "Number of Units"
+          - "Units"
+        dtype: "integer"
+        role: "input"
+        description: "The count of units of this floorplan."
+        example: 50
+        min: 0
+        max: 2000
+
+      avg_sf:
+        label: "Avg. SF"
+        aliases:
+          - "Average Square Feet"
+          - "Square Feet"
+          - "SF"
+        dtype: "integer"
+        unit: "SF"
+        role: "input"
+        description: "Average square footage of this unit type."
+        example: 500
+        min: 0
+        max: 8000
+
+      rent:
+        label: "Rent"
+        aliases:
+          - "Monthly Rent/Unit"
+        dtype: "currency"
+        unit: "USD/month"
+        format: "$0"
+        role: "input"
+        description: "Monthly rent charged for that unit type."
+        example: 1875
+
+      rent_psf:
+        label: "Rent PSF"
+        aliases:
+          - "$/SF"
+          - "Rent/SF"
+        dtype: "currency_per_sqft"
+        unit: "USD/SF/month"
+        role: "derived_input"
+        description: "Rent per square foot; typically rent / avg_sf."
+        derived_from:
+          - "rent"
+          - "avg_sf"
+      original_label:
+        label: "Original Unit Label"
+        description: "Source unit type name for traceability."
+
+  # --------------------------------------------------------------------------
+  # SECTION: GROWTH / TRENDING ASSUMPTIONS
+  # --------------------------------------------------------------------------
+  growth_assumptions:
+    kind: "scalar_group"
+    label: "Operations Assumptions / Trending / Growth Assumptions"
+    description: "Growth assumptions for revenue and expenses in the model."
     fields:
-      transaction_closing_date:
-        label: "Transaction Closing Date"
+      market_rent_growth:
+        label: "Market Rent Growth"
         aliases:
-          [
-            "Closing Date",
-            "Acquisition Closing Date",
-            "Construction Loan Close Date",
-          ]
-        type: date
-        description: Date the acquisition / construction loan closes.
-      construction_start_date:
-        label: "Construction Start Date"
-        aliases: ["Const Start Date", "Vertical Start Date"]
-        type: date
-        description: Date vertical or major construction begins.
-      construction_start_month_index:
-        label: "Construction Start Month"
-        aliases: ["Const Start Month", "Month Construction Starts"]
-        type: integer
-        description: Month index when construction starts (Month 1, Month 2, etc.).
-      construction_period_months:
-        label: "Construction Period"
+          - "Income Growth Rate"
+          - "Rent Growth Rate"
+          - "Residential Rent Growth"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 2.5
+        min: 0
+        max: 10
+
+      affordable_rent_growth:
+        label: "Affordable Rent Growth"
         aliases:
-          [
-            "Const Duration Months",
-            "Construction Months",
-            "Build Period Months",
-          ]
-        type: integer
-        description: Total construction duration in months.
-      construction_completion_month_index:
+          - "Growth rate of affordable rents"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 2.5
+        min: 0
+        max: 10
+
+      other_income_growth:
+        label: "Other Income Growth"
+        aliases:
+          - "Income Growth Rate"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 3.0
+        min: 0
+        max: 10
+
+      controllables_growth:
+        label: "Controllables Growth"
+        aliases:
+          - "Operating Expense Growth"
+          - "Expense Growth"
+          - "Opex Growth"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 2.0
+        min: 0
+        max: 10
+
+      taxes_growth:
+        label: "Taxes Growth"
+        aliases:
+          - "Operating Expense Growth"
+          - "Expense Growth"
+          - "Opex Growth"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 2.0
+        min: 0
+        max: 10
+
+      insurance_growth:
+        label: "Insurance Growth"
+        aliases:
+          - "Operating Expense Growth"
+          - "Expense Growth"
+          - "Opex Growth"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 2.0
+        min: 0
+        max: 10
+
+  # --------------------------------------------------------------------------
+  # SECTION: WATERFALL
+  # --------------------------------------------------------------------------
+  waterfall:
+    kind: "table"
+    label: "Waterfall"
+    description: >
+      Waterfall structure governing how cash flows are split between limited
+      partner (LP) and general partner (GP) across IRR / MOIC hurdles.
+    row_key_field: "tier_name"
+    row_match_strategy: "ordered_tiers"   # Tier 1 .. Tier 5
+    tier_order:
+      - "Tier 1"
+      - "Tier 2"
+      - "Tier 3"
+      - "Tier 4"
+      - "Tier 5"
+    columns:
+      tier_name:
+        label: "Tier"
+        aliases:
+          - "Tier 1"
+          - "Tier 2"
+          - "Tier 3"
+          - "Tier 4"
+          - "Tier 5"
+        dtype: "string"
+        role: "input"
+        description: "Name/level of the hurdle."
+
+      lp_split_pct:
+        label: "LP Split %"
+        aliases:
+          - "LP"
+          - "Limited partner split"
+          - "LP Cash Flow"
+          - "LP distribution"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 95.0
+        min: 0
+        max: 100
+
+      gp_split_pct:
+        label: "GP Split %"
+        aliases:
+          - "GP"
+          - "General partner split"
+          - "GP Cash Flow"
+          - "GP distribution"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 5.0
+        min: 0
+        max: 100
+
+      hurdle_irr_pct:
+        label: "Hurdle IRR %"
+        aliases:
+          - "Hurdle IRR"
+          - "IRR Hurdle"
+        dtype: "percent"
+        role: "input"
+        unit: "% IRR"
+        format: "0.00% IRR"
+        example: 15.0
+        min: 0
+        max: 100
+
+      moic_multiple:
+        label: "MOIC Multiple"
+        aliases:
+          - "Multiple"
+          - "MOIC Hurdle"
+          - "Multiple Hurdle"
+        dtype: "float"
+        role: "input"
+        unit: "x"
+        format: "0.00x"
+        example: 1.5
+        min: 0
+        max: 6
+
+      dollar_amount:
+        label: "Dollar Amount"
+        aliases:
+          - "$ Amount"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        description: >
+          Optional — some waterfalls use a dollar threshold instead of
+          IRR / MOIC; rare but supported.
+        example: 1500000
+      original_label:
+        label: "Original Tier Label"
+        description: "Source tier label when it does not match canonical tier names."
+
+  # --------------------------------------------------------------------------
+  # SECTION: OTHER INCOME
+  # --------------------------------------------------------------------------
+  other_income:
+    kind: "table"
+    label: "Other Income"
+    description: >
+      Assumptions regarding other income generated at the property besides base rent
+      (e.g. pet fees, internet fees, application fees, parking, storage).
+      Column structure is fixed; line-item names vary by model.  AI should map
+      line items semantically to the closest canonical item where possible,
+      but preserve unseen names in an "Other" bucket.
+    row_key_field: "item_name"
+    row_match_strategy: "semantic_label"
+    columns:
+      item_name:
+        label: "Other Income Item"
+        aliases:
+          - "Line Item"
+        dtype: "string"
+        role: "input"
+        description: "Canonical description of the income item (e.g. Amenity / Trash / Pest)."
+
+      num_units:
+        label: "# of Units"
+        aliases:
+          - "Units"
+          - "Count"
+        dtype: "integer"
+        role: "input"
+        description: "Quantity or count for which this fee is charged per month."
+        example: 145
+        min: 0
+        max: 2000
+
+      amount_per_month:
+        label: "$ Per Month"
+        aliases:
+          - "Rent / Month"
+          - "$ Per Month"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        description: "Dollar amount charged per month for each unit of this line item."
+        example: 10
+        min: 0
+        max: 1000
+
+      # Optional derived totals; client model usually calculates these.
+      total_monthly_income:
+        label: "Total Monthly Income"
+        dtype: "currency"
+        role: "calculated_output"
+        derived_from:
+          - "num_units"
+          - "amount_per_month"
+
+    canonical_items:
+      amenity_trash_pest:
+        label: "Amenity / Trash / Pest"
+        aliases:
+          - "Amenity Fees"
+          - "Trash Fee"
+          - "Pest Control Fee"
+        description: >
+          Fees for amenities, valet trash service, pest control programs,
+          or other non-utility service charges.
+      bulk_wifi:
+        label: "Bulk Wifi"
+        aliases:
+          - "Internet Fee"
+          - "Managed Wi-Fi"
+          - "Bulk Bandwidth Revenue"
+        description: "Revenue from property-wide bulk internet service."
+      application_fees_admin_other:
+        label: "Application Fees / Admin / Other"
+        aliases:
+          - "Application Fee"
+          - "Admin Fee"
+          - "Lease Initiation Fee"
+        description: "Application and admin fees collected at move-in."
+      rubs:
+        label: "RUBS"
+        aliases:
+          - "Utility Reimbursement"
+          - "Ratio Utility Billing"
+        description: "Resident reimbursements for utilities (water/sewer/trash etc.)."
+      premiums:
+        label: "Premiums"
+        aliases:
+          - "Unit Premiums"
+          - "Location Premiums"
+          - "View Premiums"
+        description: "Rent premiums for upgraded units/views/locations."
+      pet_rent_one_time_fee:
+        label: "Pet Rent - One-Time Fee"
+        aliases:
+          - "Pet Deposit"
+          - "One-Time Pet Fee"
+          - "Pet Move-In Fee"
+        description: "One-time fee for residents with pets at move-in."
+      pet_rent_monthly:
+        label: "Pet Rent - Monthly"
+        aliases:
+          - "Monthly Pet Fee"
+          - "Recurring Pet Rent"
+        description: "Monthly recurring pet rent."
+      reserved_parking:
+        label: "Reserved Parking"
+        aliases:
+          - "Assigned Parking Fee"
+          - "Reserved Stall Fee"
+        description: "Monthly fee for reserved parking spaces."
+      garage_first_car:
+        label: "Garage - First Car"
+        aliases:
+          - "Garage Parking Fee"
+          - "Primary Vehicle Garage"
+        description: "Garage fee for the first vehicle."
+      garage_second_car:
+        label: "Garage - Second Car"
+        aliases:
+          - "Additional Garage Space"
+          - "Secondary Vehicle Garage"
+        description: "Garage fee for second vehicle."
+      cable_phone_etc:
+        label: "Cable, Phone, Etc"
+        aliases:
+          - "Cable TV Revenue"
+          - "Telecom Revenue"
+          - "Media Services"
+        description: "Revenue from optional cable/phone/media services."
+      storage:
+        label: "Storage"
+        aliases:
+          - "Storage Rental"
+          - "Unit Storage"
+          - "Storage Locker Fee"
+        description: "Monthly rental for storage units or lockers."
+      misc:
+        label: "Misc."
+        aliases:
+          - "Other Income"
+          - "Ancillary Fees"
+          - "Miscellaneous Revenue"
+        description: "Catch-all for miscellaneous other income."
+      other_1:
+        label: "Other 1"
+        description: "Open bucket for unmapped / rare line items."
+      other_2:
+        label: "Other 2"
+        description: "Open bucket for unmapped / rare line items."
+      other_3:
+        label: "Other 3"
+        description: "Open bucket for unmapped / rare line items."
+      original_label:
+        label: "Original Item Label"
+        description: "Source line-item name when mapped to a generic bucket."
+
+  # --------------------------------------------------------------------------
+  # SECTION: PROPERTY INFORMATION
+  # --------------------------------------------------------------------------
+  property_information:
+    kind: "scalar_group"
+    label: "Property Information"
+    aliases:
+      - "Deal Information"
+    fields:
+      deal_name:
+        label: "Deal Name"
+        aliases:
+          - "Name"
+          - "Transaction Name"
+        dtype: "string"
+        role: "input"
+      address:
+        label: "Address"
+        dtype: "string"
+        role: "input"
+      city:
+        label: "City"
+        dtype: "string"
+        role: "input"
+      state:
+        label: "State"
+        dtype: "string"
+        role: "input"
+      land_size_acres:
+        label: "Land Size"
+        aliases:
+          - "Acres"
+          - "Acreage"
+          - "Site Size"
+        dtype: "integer"
+        unit: "Acres"
+        role: "input"
+        example: 1
+
+  # --------------------------------------------------------------------------
+  # SECTION: PROJECT TIMELINE
+  # --------------------------------------------------------------------------
+  project_timeline:
+    kind: "scalar_group"
+    label: "Project Timeline"
+    aliases:
+      - "Milestones"
+      - "Deal Timing"
+      - "Key Dates"
+    description: "Major construction and lease-up timing milestones."
+    fields:
+      land_closing_date:
+        label: "Land Closing Date"
+        aliases:
+          - "Closing Date"
+          - "Model Start Date"
+          - "Analysis Start Date"
+          - "Land Acquisition"
+          - "Start Date"
+        dtype: "date"
+        role: "input"
+        format: "MM/DD/YYYY"
+        example: "02/24/2024"
+
+      construction_start_month:
+        label: "Construction Start"
+        aliases:
+          - "Months to Construction Start"
+        dtype: "integer"
+        unit: "Month"
+        role: "input"
+        example: 0
+
+      construction_completion_month:
         label: "Construction Completion"
         aliases:
-          ["Const Completion Month", "Construction Complete Month", "CO Month"]
-        type: integer
-        description: Month index when construction is considered complete.
-      first_units_delivered_month_index:
-        label: "First Units Delivered (Opex Starts)"
-        aliases:
-          [
-            "First Delivery Month",
-            "First Units Delivery Month",
-            "Opex Start Month",
-          ]
-        type: integer
-        description: Month index when first units are delivered and operating expenses begin.
-      absorption_start_month_index:
-        label: "Absorption Start Month"
-        aliases: ["Lease-Up Start Month", "Initial Absorption Month"]
-        type: integer
-        description: Month index when lease-up / absorption of units begins.
-      last_units_delivered_month_index:
-        label: "Last Units Delivered"
-        aliases:
-          [
-            "Last Delivery Month",
-            "Final Units Delivery Month",
-            "Stabilization Delivery Month",
-          ]
-        type: integer
-        description: Month index when final units are delivered and available for lease.
+          - "Construction Months"
+          - "Last Units"
+          - "Construction Period"
+          - "Last C. O."
+        dtype: "integer"
+        unit: "Month"
+        role: "input"
+        example: 24
 
-  - name: senior_loan_terms
+      first_units_delivered_month:
+        label: "First Units Delivered"
+        aliases:
+          - "First C. O."
+          - "1st Units"
+        dtype: "integer"
+        unit: "Month"
+        role: "input"
+        example: 14
+
+      lease_up_commencement_month:
+        label: "Lease Up Commencement"
+        aliases:
+          - "Absorption Start"
+          - "Leasing Start"
+          - "First Unit C.O. Date"
+        dtype: "integer"
+        unit: "Month"
+        role: "input"
+        example: 14
+
+  # --------------------------------------------------------------------------
+  # SECTION: REVENUE & LEASE-UP ASSUMPTIONS
+  # --------------------------------------------------------------------------
+  revenue_and_leaseup:
+    kind: "scalar_group"
+    label: "Revenue and Lease Up Assumptions"
+    aliases:
+      - "General Assumptions"
+      - "Concession Assumptions"
+      - "Lease Up Assumptions"
+    description: "General revenue assumptions and leasing velocity / concessions."
+    fields:
+      vacancy_pct:
+        label: "Vacancy"
+        aliases:
+          - "Vacancy Rate"
+          - "Vacancy Factor"
+          - "Physical Vacancy Loss"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 3.0
+        min: 0
+        max: 20
+
+      loss_to_lease_pct:
+        label: "Loss to Lease"
+        aliases:
+          - "Loss Factor"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 0.0
+        min: 0
+        max: 5
+
+      bad_debt_pct:
+        label: "Bad Debt"
+        aliases:
+          - "Collections loss"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 1.0
+        min: 0
+        max: 10
+
+      model_units:
+        label: "Model Units"
+        aliases:
+          - "Employee Unit"
+          - "Model Unit"
+        dtype: "integer"
+        unit: "Units"
+        role: "input"
+        example: 0
+
+      concessions_lease_up_months:
+        label: "Concessions - Lease Up (New)"
+        aliases:
+          - "Months Free"
+          - "Months Abated Rent"
+        dtype: "duration"
+        unit: "Months"
+        role: "input"
+        example: 1.0
+        min: 0
+        max: 4
+
+      leased_units_per_month:
+        label: "Leased Units Per Month"
+        aliases:
+          - "Absorption"
+          - "Lease Up Velocity"
+          - "Units Absorbed Per Month"
+          - "Leasing Velocity"
+        dtype: "integer"
+        unit: "Units"
+        role: "input"
+        example: 20
+
+      renewal_probability_pct:
+        label: "Renewal Probability"
+        aliases:
+          - "Turnover Rate"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 50.0
+        min: 30
+        max: 90
+
+      lease_term_months:
+        label: "Lease Term"
+        aliases:
+          - "Average Lease Duration"
+        dtype: "duration"
+        unit: "Months"
+        role: "input"
+        example: 12
+
+      advanced_free_rent_features_note:
+        label: "Advanced Lease-Up Free Rent Features"
+        dtype: "string"
+        role: "ignore"
+        description: >
+          Advanced free-rent step features are uncommon and wired into the
+          client model; AI should NOT search for or populate them and they
+          should remain at 0 Months.
+
+  # --------------------------------------------------------------------------
+  # SECTION: OPERATING EXPENSES
+  # --------------------------------------------------------------------------
+  operating_expenses:
+    kind: "scalar_group"
+    label: "Operating Expenses"
+    aliases:
+      - "Opex"
+      - "Expense Assumptions"
+      - "Operating Expense Assumptions"
+    description: "Assumptions regarding annual operating expenses for the property."
+    fields:
+      payroll:
+        label: "Payroll"
+        aliases:
+          - "Payroll and Related"
+          - "Salaries"
+          - "Salaries and wages"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 1500
+        min: 0
+        max: 10000
+
+      utilities:
+        label: "Utilities"
+        aliases:
+          - "Utilities (Net)"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 100
+        min: 0
+        max: 3000
+
+      turnover:
+        label: "Turnover"
+        aliases:
+          - "Make-Ready"
+          - "Unit Turnover"
+          - "Unit Prep"
+          - "Redecorating"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 300
+        min: 0
+        max: 2000
+
+      contract_services:
+        label: "Contract Services"
+        aliases:
+          - "Landscaping"
+          - "Service Contracts"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 150
+        min: 0
+        max: 2000
+
+      repairs_maintenance:
+        label: "Repairs and Maintenance"
+        aliases:
+          - "R&M"
+          - "Maintenance"
+          - "Building Repairs"
+          - "Routine Repairs"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 500
+        min: 0
+        max: 2000
+
+      leasing_marketing:
+        label: "Leasing and Marketing"
+        aliases:
+          - "Marketing"
+          - "Advertising"
+          - "Lease-Up Costs"
+          - "Leasing Fees"
+          - "Tenant Procurement"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 250
+        min: 0
+        max: 2000
+
+      general_admin:
+        label: "General and Administrative"
+        aliases:
+          - "G&A"
+          - "Admin"
+          - "Office Expenses"
+          - "Administrative Overhead"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 300
+        min: 0
+        max: 2000
+
+      other_expenses:
+        label: "Other Expenses"
+        aliases:
+          - "Miscellaneous Expenses"
+          - "Non-Allocated Expenses"
+          - "Other Opex"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 0
+        min: 0
+        max: 2000
+
+      management_fee_pct:
+        label: "Management Fee"
+        aliases:
+          - "Property Management"
+          - "Property Management Fee"
+          - "Management Expense"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 3.0
+        min: 0
+        max: 10
+
+      insurance:
+        label: "Insurance"
+        aliases:
+          - "Property Insurance"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 400
+        min: 0
+        max: 10000
+
+      property_taxes:
+        label: "Property Taxes"
+        aliases:
+          - "Taxes"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 5250
+        min: 0
+        max: 25000
+
+      other_taxes_fees:
+        label: "Other Taxes / Fees"
+        aliases:
+          - "Franchise Taxes"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 0
+        min: 0
+        max: 10000
+
+      replacement_reserves:
+        label: "Replacement Reserves"
+        aliases:
+          - "Capital Reserves"
+          - "Reserves"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 0
+        min: 0
+        max: 1000
+
+  # --------------------------------------------------------------------------
+  # SECTION: SENIOR LOAN TERMS
+  # --------------------------------------------------------------------------
+  senior_loan_terms:
+    kind: "scalar_group"
     label: "Senior Loan Terms"
-    description: Assumptions for the primary senior construction/perm loan.
+    aliases:
+      - "Construction Loan"
+      - "Debt Assumptions"
+      - "Loan Assumptions"
+      - "Senior Construction Debt Terms"
     fields:
       loan_to_cost_pct:
         label: "Loan to Cost %"
         aliases:
-          ["LTC", "Loan-to-Cost", "Loan to Cost", "LTC %", "LTC on Total Cost"]
-        type: percent
-        description: Senior loan amount as a percentage of total project cost.
+          - "Construction Financing LTC"
+          - "LTC"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 60.0
+        min: 0
+        max: 100
+
       interest_type:
         label: "Interest Type - Fixed/Floating"
-        aliases: ["Interest Type", "Rate Type", "Fixed or Floating"]
-        type: enum
-        allowed_values: ["Fixed-Rate", "Floating-Rate", "Fixed", "Floating"]
-        description: Whether the senior loan rate is fixed or floating.
-      floating_curve:
+        aliases:
+          - "Fixed vs. Variable Rate"
+          - "Floating-Rate Structure"
+          - "Rate Type"
+        dtype: "enum"
+        role: "input"
+        allowed_values:
+          - "Fixed"
+          - "Floating"
+
+      curve:
         label: "Curve"
         aliases:
-          ["Index", "Reference Rate", "Base Rate", "SOFR Curve", "LIBOR Curve"]
-        type: string
-        description: Reference rate for floating loans (e.g., SOFR, LIBOR).
+          - "Yield Curve"
+          - "Forward Curve"
+          - "Rate Curve"
+        dtype: "string"
+        role: "input"
+        example_values:
+          - "SOFR"
+          - "BSBY"
+          - "10YR UST"
+
       sofr_spread_pct:
         label: "SOFR Spread"
         aliases:
-          ["Spread over SOFR", "Rate Spread", "Loan Spread", "Credit Spread"]
-        type: percent
-        description: Spread over the reference curve for calculating the loan rate.
+          - "Credit Spread"
+          - "Loan Spread"
+          - "Margin over SOFR"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 0.0
+        min: 0
+        max: 20
+
       sofr_floor_pct:
         label: "SOFR Floor"
-        aliases: ["Rate Floor", "Interest Floor", "Index Floor"]
-        type: percent
-        description: Minimum reference rate applied when calculating floating interest.
+        aliases:
+          - "Interest Rate Floor"
+          - "Base Rate Minimum"
+          - "SOFR Minimum"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 0.0
+        min: 0
+        max: 10
+
       sofr_cap_pct:
         label: "SOFR Cap"
-        aliases: ["Rate Cap", "Interest Cap", "Index Cap"]
-        type: percent
-        description: Maximum reference rate used for interest calculations (if any).
+        aliases:
+          - "Rate Cap"
+          - "Interest Rate Cap"
+          - "SOFR Maximum"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 0.0
+        min: 0
+        max: 100
+
       interest_only_period_months:
         label: "Interest Only Period"
-        aliases: ["IO Period", "Interest-Only Months", "I/O Months"]
-        type: integer
-        description: Number of months the loan is interest-only.
+        aliases:
+          - "IO Period"
+          - "IO Duration"
+        dtype: "duration"
+        unit: "Months"
+        role: "input"
+        example: 24
+        min: 0
+        max: 360
+
       amortization_schedule_years:
         label: "Amortization Schedule"
         aliases:
-          ["Amortization (Years)", "Amortization Term Years", "Amort Term"]
-        type: number
-        description: Amortization period length in years for principal repayment.
+          - "Amort Schedule"
+          - "Amort Profile"
+          - "Amort Period"
+        dtype: "duration"
+        unit: "Years"
+        role: "input"
+        example: 30
+        min: 0
+        max: 31
+
       initial_term_months:
         label: "Initial Term"
-        aliases: ["Loan Term Months", "Initial Loan Term", "Base Term Months"]
-        type: integer
-        description: Initial loan term length in months before extensions.
-      loan_maturity_date:
+        aliases:
+          - "Base Term"
+          - "Primary Term"
+        dtype: "duration"
+        unit: "Months"
+        role: "input"
+        example: 24
+        min: 0
+        max: 360
+
+      loan_maturity_months:
         label: "Loan Maturity"
-        aliases: ["Maturity Date", "Loan Maturity Date", "Final Maturity Date"]
-        type: date
-        description: Final maturity date for the senior loan under the base case.
+        aliases:
+          - "Maturity Term"
+        dtype: "duration"
+        unit: "Months"
+        role: "input"
+
       origination_fee_pct:
         label: "Origination Fee"
         aliases:
-          [
-            "Origination Points",
-            "Loan Origination Fee",
-            "Upfront Fee",
-            "Points",
-          ]
-        type: percent
-        description: Upfront lender origination fee as a percentage of loan amount.
-      rate_stepdown_dscr:
+          - "Upfront Fee"
+          - "Lender Fee"
+          - "Arrangement Fee"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 0.0
+        min: 0
+        max: 10
+
+      rate_stepdown_dscr_multiple:
         label: "Rate Stepdown DSCR"
-        aliases: ["DSCR Trigger", "DSCR Threshold for Stepdown"]
-        type: number
-        description: DSCR threshold at which a rate stepdown may occur (if modeled).
-      rate_stepdown_dy:
+        aliases:
+          - "DSCR-Based Rate Reduction"
+          - "DSCR Performance Stepdown"
+          - "DSCR Triggered Stepdown"
+        dtype: "float"
+        role: "input"
+        unit: "x"
+        format: "0.00x"
+        example: 1.25
+        min: 0
+        max: 2
+
+      rate_stepdown_dy_pct:
         label: "Rate Stepdown DY"
         aliases:
-          ["Debt Yield Trigger", "Debt Yield Threshold", "DY for Stepdown"]
-        type: number
-        description: Debt yield threshold at which a rate stepdown may occur (if modeled).
-      rate_stepdown_change_pct:
+          - "Debt Yield Stepdown"
+          - "DY-Based Rate Reduction"
+          - "DY Triggered Stepdown"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 0.0
+        min: 0
+        max: 20
+
+      stepdown_rate_pct:
         label: "Stepdown Rate"
-        aliases: ["Rate Reduction", "Spread Stepdown", "Interest Stepdown"]
-        type: percent
-        description: Size of the interest rate reduction at stepdown (if applicable).
-      exit_month_index:
-        label: "Exit Month"
-        aliases: ["Loan Payoff Month", "Refi/Sale Month for Debt"]
-        type: integer
-        description: Month index when the senior loan is fully repaid due to sale/refi.
+        aliases:
+          - "Reduced Rate"
+          - "Marginal Rate"
+          - "Performance Rate"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 0.0
+        min: 0
+        max: 20
+
       exit_fee_pct:
         label: "Exit Fee"
-        aliases: ["Prepayment Fee", "Termination Fee", "Loan Exit Fee"]
-        type: percent
-        description: Lender exit fee as a percent of outstanding loan or original balance.
+        aliases:
+          - "Prepayment Fee"
+          - "Back-End Fee"
+          - "Loan Exit Charge"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 0.0
+        min: 0
+        max: 10
 
-  - name: sources_and_uses
+  # --------------------------------------------------------------------------
+  # SECTION: PREFERRED EQUITY TERMS
+  # --------------------------------------------------------------------------
+  preferred_equity_terms:
+    kind: "scalar_group"
+    label: "Preferred Equity Terms"
+    aliases:
+      - "Mezzanine Construction Debt"
+      - "Mezzanine Construction Loan"
+    fields:
+      has_preferred_equity:
+        label: "Preferred Equity?"
+        dtype: "boolean"
+        role: "input"
+
+      loan_to_cost_pct:
+        label: "Loan to Cost %"
+        aliases:
+          - "Construction Financing LTC"
+          - "LTC%"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 90.0
+        min: 0
+        max: 100
+
+      initial_term_months:
+        label: "Initial Term"
+        aliases:
+          - "Base Term"
+          - "Primary Term"
+          - "Maturity"
+        dtype: "duration"
+        unit: "Months"
+        role: "input"
+        example: 48
+        min: 0
+        max: 240
+
+      interest_type:
+        label: "Interest Type - Fixed/Floating"
+        aliases:
+          - "Fixed vs. Variable Rate"
+          - "Floating-Rate Structure"
+          - "Rate Type"
+        dtype: "enum"
+        role: "input"
+        allowed_values:
+          - "Fixed"
+          - "Floating"
+
+      sofr_spread_pct:
+        label: "SOFR Spread"
+        aliases:
+          - "Credit Spread"
+          - "Loan Spread"
+          - "Margin over SOFR"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 10.0
+        min: 0
+        max: 20
+
+      sofr_floor_pct:
+        label: "SOFR Floor"
+        aliases:
+          - "Interest Rate Floor"
+          - "Base Rate Minimum"
+          - "SOFR Minimum"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 0.0
+        min: 0
+        max: 10
+
+      total_interest_rate_pct:
+        label: "Total Interest Rate"
+        description: "Combined floating index + spread or fixed preferred return rate."
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+
+      minimum_multiple:
+        label: "Minimum Multiple"
+        aliases:
+          - "MOIC"
+          - "Min MOIC"
+          - "Min Multiple"
+        dtype: "float"
+        role: "input"
+        unit: "x"
+        format: "0.00x"
+        example: 0.0
+        min: 0
+        max: 2
+
+      current_pay_pct:
+        label: "Current Pay %"
+        aliases:
+          - "Non-accrual interest rate"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 5.0
+        min: 0
+        max: 20
+
+      accrual_pct:
+        label: "Accrual %"
+        aliases:
+          - "PIK"
+          - "Accrual interest rate"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 10.0
+        min: 0
+        max: 20
+
+  # --------------------------------------------------------------------------
+  # SECTION: EXIT ASSUMPTIONS
+  # --------------------------------------------------------------------------
+  exit_assumptions:
+    kind: "scalar_group"
+    label: "Exit Assumptions"
+    aliases:
+      - "Sale Assumptions"
+      - "Reversion Assumptions"
+      - "Disposition Assumptions"
+      - "Cap Rate Assumptions"
+    fields:
+      sale_date:
+        label: "Sale Date"
+        aliases:
+          - "Construction Loan"
+          - "Debt"
+        dtype: "date"
+        role: "calculated_output"
+        description: >
+          Calculated from other assumptions in the model; AI may read for
+          comparison but should not set.
+
+      sale_month:
+        label: "Sale Month"
+        aliases:
+          - "Exit Month"
+          - "Reversion Month"
+          - "Disposition Month"
+          - "Month Sold"
+        dtype: "integer"
+        unit: "Month"
+        role: "input"
+        example: 96
+        min: 0
+        max: 120
+
+      noi_type:
+        label: "NOI Type"
+        aliases:
+          - "Sale NOI Base"
+          - "Sale NOI Timing"
+        dtype: "enum"
+        role: "input"
+        allowed_values:
+          - "T1"
+          - "T12"
+          - "F12"
+
+      sale_costs_pct:
+        label: "Sale Costs %"
+        aliases:
+          - "Selling Costs"
+          - "Closing Costs"
+          - "Transaction Costs"
+          - "% of Sale Costs"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 1.0
+        min: 0
+        max: 8
+
+      exit_cap_rate_mf_pct:
+        label: "Exit Capitalization Rate (MF)"
+        aliases:
+          - "Exit Cap Rate"
+          - "Sale Cap (MF)"
+          - "Terminal Cap Rate – MF"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 6.0
+        min: 0
+        max: 15
+
+      exit_cap_rate_retail_pct:
+        label: "Exit Capitalization (Retail)"
+        aliases:
+          - "Exit Cap Rate (Retail)"
+          - "Sale Cap (Retail)"
+          - "Terminal Cap Rate – Retail"
+          - "Commercial exit cap rate"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 6.0
+        min: 0
+        max: 15
+
+  # --------------------------------------------------------------------------
+  # SECTION: TAX REASSESSMENT AT EXIT
+  # --------------------------------------------------------------------------
+  tax_reassessment_at_exit:
+    kind: "scalar_group"
+    label: "Tax Reassessment at Exit"
+    fields:
+      reassess_at_sale:
+        label: "Reassess at Sale"
+        dtype: "boolean"
+        role: "input"
+        example: true
+
+      property_tax_millage_rate_pct:
+        label: "Property Tax Millage Rate"
+        aliases:
+          - "Mill rate"
+          - "Tax rate"
+          - "Property Tax Rate"
+          - "Tax Levy Rate"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 1.2
+        min: 0
+        max: 10
+
+      county_assessment_pct:
+        label: "County Assessment %"
+        aliases:
+          - "Assessment ratio"
+          - "Equalization ratio"
+          - "Assessment rate"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 100.0
+        min: 0
+        max: 100
+
+      market_value_as_pct_of_sale_price:
+        label: "Market Value as % of Sale Price"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        example: 100.0
+        min: 0
+        max: 100
+
+      tax_adjusted_exit_cap_rate_mf:
+        label: "Tax Adjusted Exit Cap Rate (MF)"
+        dtype: "percent"
+        role: "calculated_output"
+        description: >
+          Calculated by the client model from other assumptions; AI may
+          read but should not populate.
+
+  # --------------------------------------------------------------------------
+  # SECTION: SOURCES AND USES / TOTAL USES
+  # --------------------------------------------------------------------------
+  sources_and_uses:
+    kind: "scalar_group"
     label: "Sources and Uses"
-    description: Capital stack and development cost budget at project start.
+    aliases:
+      - "Project Cost Summary"
+      - "Total Capitalization"
+    description: >
+      Lays out total project costs (uses) and how they are funded (sources).
+      Several source amounts are calculated outputs from other assumptions.
     fields:
       senior_loan_amount:
         label: "Senior Loan"
         aliases:
-          [
-            "Senior Debt",
-            "Construction Loan",
-            "First Mortgage",
-            "Senior Facility",
-          ]
-        type: currency
-        description: Total proceeds from the senior loan facility.
+          - "Construction Loan"
+          - "Debt"
+        dtype: "currency"
+        role: "calculated_output"
+        format: "$0"
+        description: "Model-calculated senior loan amount."
+
       preferred_equity_amount:
         label: "Preferred Equity"
-        aliases: ["Pref Equity", "Preferred", "Mezz Pref", "Preferred Capital"]
-        type: currency
-        description: Total contributed preferred equity (if any).
-      investor_equity_amount:
-        label: "Investor Equity"
         aliases:
-          ["Common Equity", "LP Equity", "Equity", "Sponsor + Investor Equity"]
-        type: currency
-        description: Total common equity contributed by investors / sponsor.
-      ace_development_equity_amount:
-        label: "Ace Development Equity"
-        aliases: ["Sponsor Equity", "Developer Equity", "GP Equity"]
-        type: currency
-        description: Sponsor or development partner equity contribution.
-      total_sources_amount:
-        label: "Total Sources"
+          - "Mezzanine Debt"
+        dtype: "currency"
+        role: "calculated_output"
+        format: "$0"
+
+      lp_equity_amount:
+        label: "LP Equity"
         aliases:
-          ["Total Capital Sources", "Total Uses (Sources)", "Total Funding"]
-        type: currency
-        description: Sum of all capital sources; should equal total uses.
-      land_cost:
+          - "Limited Partner Equity"
+          - "Third Party Equity"
+        dtype: "currency"
+        role: "calculated_output"
+        format: "$0"
+
+      gp_equity_amount:
+        label: "GP Equity"
+        aliases:
+          - "General Partner Equity"
+          - "Developer Equity"
+        dtype: "currency"
+        role: "calculated_output"
+        format: "$0"
+
+      land_acquisition_cost:
         label: "Land"
-        aliases: ["Land Cost", "Site Cost", "Land Acquisition"]
-        type: currency
-        description: Land acquisition cost in the uses budget.
-      hard_costs:
+        aliases:
+          - "Acquisition costs"
+          - "Land cost"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 10000000
+
+      hard_costs_total:
         label: "Hard Costs"
         aliases:
-          ["Direct Construction Costs", "Hard Construction", "Building Costs"]
-        type: currency
-        description: Direct construction costs (labor, materials, GC).
-      soft_costs:
+          - "Total hard costs"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 19350000
+
+      soft_costs_total:
         label: "Soft Costs"
-        aliases: ["Soft Development Costs", "Softs", "Indirect Costs"]
-        type: currency
-        description: Indirect costs such as professional fees, permits, design, etc.
+        aliases:
+          - "Total soft costs"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 4000347
+
       financing_costs:
         label: "Financing Costs"
-        aliases: ["Financing Fees", "Loan Costs", "Capitalized Interest & Fees"]
-        type: currency
-        description: Interest, loan fees, and other financing-related costs.
+        aliases:
+          - "Senior loan costs"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 208728
+
       operating_reserve:
         label: "Operating Reserve"
         aliases:
-          ["OpEx Reserve", "Operating Deficit Reserve", "Lease-Up Reserve"]
-        type: currency
-        description: Reserve set aside for operating shortfalls and lease-up.
+          - "Operating shortfall"
+          - "Operations shortfall"
+          - "Operating deficits"
+          - "Preleasing expenses"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 71549
+
       senior_interest_reserve:
         label: "Senior Interest Reserve"
         aliases:
-          ["Interest Reserve", "Debt Service Reserve", "Interest Carry Reserve"]
-        type: currency
-        description: Reserve specifically for senior loan interest carry.
-      total_uses_amount:
+          - "Interest reserve shortfall"
+          - "Interest expense"
+          - "Interest deficits"
+        dtype: "currency"
+        role: "input"
+        format: "$0"
+        example: 1157333
+
+      total_uses:
         label: "Total Uses"
-        aliases: ["Total Project Cost", "Total Development Cost", "TDC"]
-        type: currency
-        description: Sum of all project uses (should match total sources).
-
-  - name: exit_assumptions
-    label: "Exit Assumptions"
-    description: Assumptions driving the exit / sale scenario.
-    fields:
-      sale_date:
-        label: "Sale Date"
-        aliases: ["Exit Date", "Disposition Date"]
-        type: date
-        description: Calendar date of the assumed property sale.
-      sale_month_index:
-        label: "Sale Month"
-        aliases: ["Exit Month", "Disposition Month"]
-        type: integer
-        description: Month index when sale occurs (relative to project start).
-      noi_type:
-        label: "NOI Type"
-        aliases: ["NOI Basis", "NOI Metric Used", "Value NOI Type"]
-        type: string
-        description: Which NOI measure is used for valuation (e.g., stabilized, forward 12).
-      sale_costs_pct:
-        label: "Sale Costs %"
         aliases:
-          ["Selling Costs %", "Disposition Costs %", "Brokerage & Closing %"]
-        type: percent
-        description: Transaction cost as a percent of gross sale price.
-      exit_cap_rate_mf_pct:
-        label: "Exit Capitalization Rate (MF)"
-        aliases:
-          ["Exit Cap Rate", "Sale Cap Rate", "Cap Rate on Exit", "MF Exit Cap"]
-        type: percent
-        description: Exit cap rate used for multifamily/income valuation.
-      exit_cap_rate_retail_pct:
-        label: "Exit Capitalization (Retail)"
-        aliases: ["Retail Exit Cap", "Retail Sale Cap", "Retail Cap Rate"]
-        type: percent
-        description: Exit cap rate used for retail component (if applicable).
+          - "Total Capitalization"
+        dtype: "currency"
+        role: "calculated_output"
+        format: "$0"
+        description: "Total project cost (sum of all uses)."
 
-  - name: tax_reassessment_at_exit
-    label: "Tax Reassessment at Exit"
-    description: Property tax assumptions at sale / reassessment.
-    fields:
-      reassess_at_sale_flag:
-        label: "Reassess at Sale"
-        aliases:
-          ["Reassessment at Sale", "Reset Taxes at Sale", "Reassess on Exit"]
-        type: boolean
-        description: Whether property taxes are reassessed at the time of sale.
-      property_tax_millage_rate_pct:
-        label: "Property Tax Millage Rate"
-        aliases: ["Millage Rate", "Tax Rate", "Property Tax Rate"]
-        type: percent
-        description: Millage / tax rate applied to assessed property value.
-      county_assessment_pct:
-        label: "County Assessment %"
-        aliases:
-          ["Assessed Value % of Market", "Assessment Ratio", "Assessment %"]
-        type: percent
-        description: Fraction of market value used as assessed value (100% = full value).
-      market_value_as_pct_of_sale_price:
-        label: "Market Value as % of Sale Price"
-        aliases: ["Market Value % of Sale", "Market/Sale Ratio", "MV/Price %"]
-        type: percent
-        description: Ratio of market (assessed) value to actual sale price.
-      tax_adjusted_exit_cap_rate_mf_pct:
-        label: "Tax Adjusted Exit Cap Rate (MF)"
-        aliases: ["Tax-Adjusted Exit Cap", "Effective Exit Cap After Taxes"]
-        type: percent
-        description: Exit cap rate adjusted for post-sale tax reassessment effects.
+  # --------------------------------------------------------------------------
+  # SECTION: GLOBAL MAPPING & ROLE NOTES
+  # --------------------------------------------------------------------------
+  mapping_guidance:
+    description: >
+      Helper rules for the LLM when mapping arbitrary underwriting workbooks
+      into this canonical schema.
 
-  - name: unit_mix_market
-    label: "Market - Unit Mix"
-    description: Market unit mix table with rent and PSF by unit type.
-    row_key: unit_type
-    columns:
-      number_of_units:
-        label: "# of Units"
-        aliases: ["Units", "Unit Count", "No. Units"]
-        type: integer
-        description: Count of units of this type in the market or subject property.
-      average_sf:
-        label: "Avg. SF"
-        aliases: ["Average SF", "Avg Unit Size", "Avg Sqft"]
-        type: number
-        description: Average square footage per unit of this type.
-      monthly_rent:
-        label: "Rent"
-        aliases: ["Market Rent", "Monthly Rent", "Unit Rent"]
-        type: currency
-        description: Average monthly rent per unit of this type.
-      rent_psf:
-        label: "PSF"
-        aliases: ["Rent PSF", "Rent/SF", "Rent per SF", "Rent per Sqft"]
-        type: number
-        description: Rent per square foot per month.
-    summary_row:
-      label: "Total / Avg - Market"
-      fields:
-        total_units:
-          type: integer
-          description: Total unit count across all types.
-        average_sf_all_units:
-          type: number
-          description: Weighted average unit size.
-        average_rent_all_units:
-          type: currency
-          description: Weighted average monthly rent per unit.
-        average_rent_psf_all_units:
-          type: number
-          description: Weighted average rent per square foot.
+    role_semantics:
+      input:
+        description: >
+          AI MUST try to map or infer a value from the source model. If
+          the value is absent, use the closest explicit assumption
+          (not derived) or clearly documented assumption.
+      derived_input:
+        description: >
+          AI may compute the value from other mapped inputs in the
+          same payload (e.g. Rent PSF = Rent / Avg. SF). If uncertain,
+          it is acceptable to re-derive inside the client model instead.
+      calculated_output:
+        description: >
+          These values are calculated inside the Perpetuity Excel model
+          from other assumptions. AI should NOT search the source model
+          specifically for these fields; however, it MAY read them from
+          the source to QA/compare outputs if needed.
+      ignore:
+        description: >
+          Advanced or rarely-used fields that the AI should not attempt
+          to map or search for. The client model will keep them at their
+          default values (often zero).
 
-  - name: inflation_indexes
-    label: "Inflation Indexes"
-    description: Annual growth rates applied to rents, other income, expenses, taxes, etc.
-    time_axis:
-      label: "Year"
-      units: "fiscal_year"
-      range: [1, 8]
-    series:
-      market_rent_growth:
-        label: "Market Rent Growth"
-        aliases: ["Rent Growth", "MRG", "Rental Growth"]
-        type: percent_per_year
-        description: Annual growth rate applied to market rents.
-      affordable_rent_growth:
-        label: "Affordable Rent Growth"
-        aliases: ["Affordable Growth", "Restricted Rent Growth"]
-        type: percent_per_year
-        description: Growth rate for affordable / restricted rents (if applicable).
-      other_income_growth:
-        label: "Other Income Growth"
-        aliases: ["Other Revenue Growth", "Ancillary Income Growth"]
-        type: percent_per_year
-        description: Growth rate for ancillary / other income categories.
-      controllables_growth:
-        label: "Controllables Growth"
-        aliases: ["Controllable Expense Growth", "Controllable OpEx Growth"]
-        type: percent_per_year
-        description: Growth rate for controllable operating expenses.
-      taxes_growth:
-        label: "Taxes Growth"
-        aliases: ["Tax Expense Growth", "Property Tax Growth"]
-        type: percent_per_year
-        description: Growth rate for property taxes beyond reassessment effects.
-      insurance_growth:
-        label: "Insurance Growth"
-        aliases: ["Insurance Expense Growth"]
-        type: percent_per_year
-        description: Growth rate for insurance expense.
+    fuzzy_matching:
+      headers:
+        description: >
+          When matching a column or field from the source workbook,
+          prioritize exact label match, then aliases, then semantic
+          similarity to the description. Prefer numeric columns whose
+          units and ranges (percent vs dollars vs months) align with the
+          dtype and allowed_range for the target field.
+      unit_mix:
+        description: >
+          For unit_mix, treat each distinct unit-type row in the source
+          as a row in the canonical table. If the analyst uses A0/A1/B1
+          naming, keep those labels but still map beds/baths-derived
+          metrics correctly where possible.
+      other_income:
+        description: >
+          For other_income, map each line item to the closest canonical
+          item via aliases and description. If an item does not clearly
+          match any canonical type, map it into one of the generic
+          'Other' buckets and preserve the original label in item_name.
 
-  - name: promote_waterfall_market
-    label: "Market - Promote / Waterfall"
-    description: Equity waterfall tiers with promotes, hurdles, and multiples.
-    row_key: tier_name
-    columns:
-      promote_pct:
-        label: "Promote"
-        aliases: ["Carry", "Carried Interest", "Promote %"]
-        type: percent
-        description: Sponsor promote / carried interest percent for this tier.
-      hurdle_rate_pct:
-        label: "Hurdle"
-        aliases: ["Hurdle Rate", "Preferred Return Hurdle", "IRR Hurdle"]
-        type: percent
-        description: Minimum IRR or return threshold to reach this tier.
-      multiple:
-        label: "Multiple"
-        aliases: ["Equity Multiple", "MOIC", "Multiple on Invested Capital"]
-        type: number
-        description: Equity multiple associated with this tier (if modeled).
-      amount_share_pct:
-        label: "% Amount"
-        aliases: ["Share of Distributions %", "Allocation %"]
-        type: percent
-        description: Share of distributions allocated in this tier.
+    tables_with_variable_labels:
+      - unit_mix
+      - other_income
 
-  - name: other_income
-    label: "Other Income"
-    description: Ancillary income items per unit per month.
-    columns:
-      number_of_units:
-        label: "# of Units"
-        aliases: ["Units", "Unit Count", "No. of Units"]
-        type: integer
-        description: Number of units paying this fee or charge.
-      amount_per_month:
-        label: "$ Per Month"
-        aliases: ["Charge per Month", "Fee per Month", "Monthly Fee"]
-        type: currency
-        description: Monthly charge per unit (or per space) for this income line.
-    rows:
-      amenity_trash_pest:
-        label: "Amenity / Trash / Pest"
-        aliases: ["Amenities Fee", "Trash/Pest Fee", "Amenity Fee"]
-        description: Combined fees for amenities, trash, and pest control.
-      bulk_wifi:
-        label: "Bulk Wifi"
-        aliases: ["Bulk Internet", "Technology Fee", "Internet Fee"]
-        description: Bulk internet or technology fee.
-      application_admin_other:
-        label: "Application Fees / Admin / Other"
-        aliases: ["Application Fee", "Admin Fee", "App/Admin Fees"]
-        description: Upfront or recurring application/administration fees.
-      rubs:
-        label: "RUBS"
-        aliases:
-          [
-            "Utility Reimbursement",
-            "Utility Billback",
-            "Ratio Utility Billing System",
-          ]
-        description: Ratio Utility Billing System income (utility bill-backs).
-      pet_rent_one_time_fee:
-        label: "Pet Rent - One-Time Fee"
-        aliases: ["Pet Fee", "Pet Move-In Fee"]
-        description: One-time pet fees per move-in.
-      pet_rent_monthly:
-        label: "Pet Rent - Monthly"
-        aliases: ["Pet Rent", "Monthly Pet Fee"]
-        description: Monthly recurring pet rent charge.
-      reserved_parking:
-        label: "Reserved Parking"
-        aliases: ["Parking Fee", "Reserved Parking Fee"]
-        description: Monthly or recurring fee for reserved parking spaces.
-      garage_first_car:
-        label: "Garage - First Car"
-        aliases: ["Garage Fee 1st Car"]
-        description: Garage income for first vehicle.
-      garage_second_car:
-        label: "Garage - Second Car"
-        aliases: ["Garage Fee 2nd Car", "Additional Garage Fee"]
-        description: Garage income for second vehicle or additional spaces.
-      cable_phone_etc:
-        label: "Cable, Phone, Etc"
-        aliases: ["Cable/Internet Package", "Telecom Fee"]
-        description: Telecom / media package income.
-      storage:
-        label: "Storage"
-        aliases: ["Storage Unit Income", "Storage Fee"]
-        description: Storage unit rental income.
-      other_income_1:
-        label: "Other"
-        aliases: ["Other Income 1", "Misc Income 1"]
-        description: Additional uncategorized other income item 1.
-      other_income_2:
-        label: "Other"
-        aliases: ["Other Income 2", "Misc Income 2"]
-        description: Additional uncategorized other income item 2.
-      other_income_3:
-        label: "Other"
-        aliases: ["Other Income 3", "Misc Income 3"]
-        description: Additional uncategorized other income item 3.
-      other_income_4:
-        label: "Other"
-        aliases: ["Other Income 4", "Misc Income 4"]
-        description: Additional uncategorized other income item 4.
-    totals:
-      total_other_income_units:
-        label: "Total Units (Other Income)"
-        type: integer
-        description: Total units used in the other income calculation.
-      total_other_income_per_month:
-        label: "Total Other Income $/Month"
-        type: currency
-        description: Aggregate monthly other income.
-
-  - name: preferred_equity_terms
-    label: "Preferred Equity Terms"
-    description: Terms for the preferred equity tranche (if used).
-    fields:
-      preferred_equity_flag:
-        label: "Preferred Equity?"
-        aliases: ["Has Preferred Equity", "Include Pref Equity", "Pref Layer?"]
-        type: boolean
-        description: Indicates whether a preferred equity layer is included.
-      pref_loan_to_cost_pct:
-        label: "Loan to Cost %"
-        aliases: ["LTC incl Pref", "Total LTC", "Effective LTC with Pref"]
-        type: percent
-        description: Effective leverage including preferred equity as part of capital stack.
-      pref_initial_term_months:
-        label: "Initial Term"
-        aliases: ["Pref Term Months", "Preferred Term"]
-        type: integer
-        description: Preferred equity term in months.
-      pref_interest_type:
-        label: "Interest Type - Fixed/Floating"
-        aliases: ["Pref Rate Type", "Preferred Rate Type"]
-        type: enum
-        allowed_values: ["Fixed", "Floating", "Fixed-Rate", "Floating-Rate"]
-        description: Whether preferred equity return is fixed or floating.
-      pref_sofr_spread_pct:
-        label: "SOFR Spread"
-        aliases: ["Pref Spread", "Pref Spread over Index"]
-        type: percent
-        description: Spread over reference curve if floating (often 0 for fixed).
-      pref_sofr_floor_pct:
-        label: "SOFR Floor"
-        aliases: ["Pref Rate Floor", "Pref Index Floor"]
-        type: percent
-        description: Floor on the reference rate for preferred equity.
-      pref_total_interest_rate_pct:
-        label: "Total Interest Rate"
-        aliases: ["Pref Coupon", "Preferred Rate", "Pref Yield"]
-        type: percent
-        description: All-in annual coupon rate on preferred equity.
-      pref_minimum_multiple:
-        label: "Minimum Multiple"
-        aliases: ["Min MOIC", "Pref Min Multiple", "Minimum Equity Multiple"]
-        type: number
-        description: Minimum equity multiple required before pref is fully repaid.
-      pref_current_pay_pct:
-        label: "Current Pay %"
-        aliases:
-          ["Current Pay Component", "Current Pay Portion", "Current Yield"]
-        type: percent
-        description: Portion of pref return paid currently (vs. accrued).
-      pref_accrual_pct:
-        label: "Accrual %"
-        aliases: ["Accrued Portion %", "Pay-in-Kind %", "PIK %"]
-        type: percent
-        description: Portion of pref return that accrues and is paid at exit.
-
-  - name: operating_expenses
-    label: "Operating Expenses"
-    description: Per-unit per-year operating expense budget and start month.
-    fields:
-      fixed_cost_start_month_index:
-        label: "Fixed Cost Start Month"
-        aliases:
-          [
-            "OpEx Start Month",
-            "Fixed OpEx Start Month",
-            "Operating Start Month",
-          ]
-        type: integer
-        description: Month index when fixed operating expenses begin in the model.
-    controllable_expenses:
-      units: "per_unit_per_year"
+    non_input_fields_from_client_notes:
+      description: >
+        The client explicitly noted that some assumptions are not
+        intended to be model inputs. For these, we assign role:
+        calculated_output or ignore so the AI does not waste effort
+        hunting them:
       items:
-        payroll:
-          label: "Payroll"
-          aliases: ["On-Site Payroll", "Staff Payroll"]
-          type: currency
-          description: Annual per-unit payroll cost.
-        utilities:
-          label: "Utilities"
-          aliases: ["Utility Expense", "Electric/Water/Gas"]
-          type: currency
-          description: Annual per-unit utilities expense.
-        turnover:
-          label: "Turnover"
-          aliases: ["Turnover Costs", "Make-Ready", "Unit Turnover"]
-          type: currency
-          description: Turnover / make-ready costs per unit per year.
-        contract_services:
-          label: "Contract Services"
-          aliases:
-            [
-              "Contracted Services",
-              "Third-Party Services",
-              "Landscaping/Security",
-            ]
-          type: currency
-          description: Third-party contracted services (landscaping, security, etc.).
-        repairs_and_maintenance:
-          label: "Repairs and Maintenance"
-          aliases: ["R&M", "Repairs/Maintenance", "Maintenance"]
-          type: currency
-          description: Routine repairs and maintenance per unit per year.
-        leasing_and_marketing:
-          label: "Leasing and Marketing"
-          aliases: ["Leasing/Marketing", "Advertising", "Marketing Expense"]
-          type: currency
-          description: Advertising, leasing commissions, and marketing costs.
-        general_and_administrative:
-          label: "General and Administrative"
-          aliases: ["G&A", "General & Admin"]
-          type: currency
-          description: G&A expenses allocated to the property.
-        other_expenses:
-          label: "Other Expenses"
-          aliases: ["Other Controllable", "Misc Controllable"]
-          type: currency
-          description: Other controllable expenses not categorized elsewhere.
-      total_controllable_expenses:
-        label: "Total Controllable Expenses"
-        aliases: ["Total Controllable OpEx", "Total Controllables"]
-        type: currency
-        description: Sum of all controllable expenses on a per-unit per-year basis.
-    non_controllable_expenses:
-      items:
-        management_fee_pct:
-          label: "Management Fee"
-          aliases:
-            ["Mgmt Fee", "Property Management Fee", "Management % of EGI"]
-          type: percent
-          description: Property management fee as a percent of effective gross income.
-        insurance:
-          label: "Insurance"
-          aliases: ["Property Insurance", "Insurance Expense"]
-          type: currency
-          description: Annual per-unit property insurance cost.
-        property_taxes:
-          label: "Property Taxes"
-          aliases: ["Real Estate Taxes", "Tax Expense"]
-          type: currency
-          description: Annual per-unit property tax cost (before reassessment).
-        other_taxes_fees:
-          label: "Other Taxes / Fees"
-          aliases: ["Misc Taxes", "Regulatory Fees", "Other Non-Controllable"]
-          type: currency
-          description: Miscellaneous non-controllable taxes and regulatory fees.
-      total_non_controllable_expenses:
-        label: "Total Non - Controllable Expenses"
-        aliases: ["Total Non-Controllable OpEx", "Total Non-Controllables"]
-        type: currency
-        description: Sum of all non-controllable operating expenses.
-    totals:
-      replacement_reserves:
-        label: "Replacement Reserves"
-        aliases: ["CapEx Reserves", "FF&E Reserves", "Reserve for Replacements"]
-        type: currency
-        description: Annual capital reserve per unit for long-term replacements.
-      total_operating_expenses:
-        label: "Total Operating Expenses"
-        aliases: ["Total OpEx", "Total Operating Costs"]
-        type: currency
-        description: Total operating expenses including controllable, non-controllable, and reserves.
+        - name: "Advanced Lease-Up Free Rent Structures"
+          location: "revenue_and_leaseup.advanced_free_rent_features_note"
+          role: "ignore"
+          reason: >
+            These are advanced features the client has pre-wired;
+            they should remain 0 Months in the created model.
+        - name: "Sale Date"
+          location: "exit_assumptions.sale_date"
+          role: "calculated_output"
+        - name: "Tax Adjusted Exit Cap Rate (MF)"
+          location: "tax_reassessment_at_exit.tax_adjusted_exit_cap_rate_mf"
+          role: "calculated_output"
+        - name: "Senior Loan Amount"
+          location: "sources_and_uses.senior_loan_amount"
+          role: "calculated_output"
+        - name: "Preferred Equity Amount"
+          location: "sources_and_uses.preferred_equity_amount"
+          role: "calculated_output"
+        - name: "LP Equity Amount"
+          location: "sources_and_uses.lp_equity_amount"
+          role: "calculated_output"
+        - name: "GP Equity Amount"
+          location: "sources_and_uses.gp_equity_amount"
+          role: "calculated_output"
+        - name: "Total Uses"
+          location: "sources_and_uses.total_uses"
+          role: "calculated_output"
 
-  - name: revenue_and_other_income_summary
-    label: "Revenue and Other Income"
-    description: Key revenue loss and lease-up assumptions.
-    fields:
-      vacancy_pct:
-        label: "Vacancy"
-        aliases: ["Vacancy Rate", "Economic Vacancy", "Physical Vacancy"]
-        type: percent
-        description: Stabilized physical or economic vacancy rate.
-      loss_to_lease_pct:
-        label: "Loss to Lease"
-        aliases: ["Loss-to-Lease", "LTL", "Mark-to-Market Discount"]
-        type: percent
-        description: Discount from market rent due to in-place leases or concessions.
-      bad_debt_pct:
-        label: "Bad Debt"
-        aliases: ["Credit Loss", "Bad Debt Expense"]
-        type: percent
-        description: Uncollectible rent as a percent of gross potential rent.
-      model_units_count:
-        label: "Model Units"
-        aliases: ["Model Apartments", "Non-Revenue Units", "Show Units"]
-        type: integer
-        description: Number of units used as model apartments (non-revenue units).
-      concessions_lease_up_new_months:
-        label: "Concessions - Lease Up (New)"
-        aliases:
-          ["Lease-Up Concessions New", "New Lease Concessions During Lease-Up"]
-        type: number
-        description: Duration of new-lease concessions during lease-up, in months.
-      concessions_lease_up_renewal_months:
-        label: "Concessions - Lease Up (Renewal)"
-        aliases: ["Lease-Up Concessions Renewal"]
-        type: number
-        description: Concession duration for renewals during lease-up, in months.
-      concessions_stabilized_new_months:
-        label: "Concessions - Stabilized (New)"
-        aliases: ["Stabilized Concessions New", "Ongoing New Lease Concessions"]
-        type: number
-        description: New-lease concessions in stabilized period, months.
-      concessions_stabilized_renewal_months:
-        label: "Concessions - Stabilized (Renewal)"
-        aliases: ["Stabilized Concessions Renewal"]
-        type: number
-        description: Renewal concessions in stabilized period, months.
-      absorption_start_month_index:
-        label: "Absorption Start Month"
-        aliases: ["Lease-Up Start Month", "Initial Lease-Up Month"]
-        type: integer
-        description: Month index when leasing/absorption starts.
-      absorption_start_date:
-        label: "Absorption Start Date"
-        aliases: ["Lease-Up Start Date", "Initial Lease-Up Date"]
-        type: date
-        description: Calendar date when lease-up begins.
-      leased_units_per_month:
-        label: "Leased Units Per Month"
-        aliases: ["Units Leased per Month", "Lease Velocity", "Leasing Pace"]
-        type: integer
-        description: Assumed number of units leased per month during absorption.
-      renewal_probability_pct:
-        label: "Renewal Probability"
-        aliases: ["Renewal Rate", "Retention Rate"]
-        type: percent
-        description: Percent of expiring leases expected to renew.
-      lease_term_months:
-        label: "Lease Term"
-        aliases: ["Lease Length", "Average Lease Term Months"]
-        type: integer
-        description: Average lease term length in months for new and renewing tenants.
+  # --------------------------------------------------------------------------
+  # END OF SCHEMA
+  # --------------------------------------------------------------------------
