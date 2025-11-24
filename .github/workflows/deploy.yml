@@ -26,7 +26,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build image
-        run: docker build -t app-image backend
+        run: docker build -t app-image -f backend/Dockerfile .
 
       - name: Tag image
         run: docker tag app-image:latest $ECR_REPOSITORY_URI:latest
