@@ -228,7 +228,6 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
               {loading && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
               {loading ? "Running..." : "Regenerate Mapping"}
             </Button>
-            {/*
             <Button
               variant="outline"
               onClick={async () => {
@@ -256,7 +255,6 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
               {exporting && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
               {exporting ? "Generating..." : "Generate Excel"}
             </Button>
-            */}
             <Button
               onClick={handleSave}
               disabled={!mapping || saving || !dirty}

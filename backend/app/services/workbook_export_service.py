@@ -27,6 +27,33 @@ SCALAR_CELL_MAP: Dict[Tuple[str, str], str] = {
     ("growth_assumptions", "controllables_growth"): "I38",
     ("growth_assumptions", "taxes_growth"): "I39",
     ("growth_assumptions", "insurance_growth"): "I40",
+    # Project timeline
+    ("project_timeline", "land_closing_date"): "C11",
+    ("project_timeline", "construction_start_month"): "C13",
+    ("project_timeline", "first_units_delivered_month"): "C16",
+    # Revenue and lease-up
+    ("revenue_and_leaseup", "vacancy_pct"): "C22",
+    ("revenue_and_leaseup", "loss_to_lease_pct"): "C23",
+    ("revenue_and_leaseup", "bad_debt_pct"): "C24",
+    ("revenue_and_leaseup", "model_units"): "C25",
+    ("revenue_and_leaseup", "concessions_lease_up_months"): "C27",
+    ("revenue_and_leaseup", "leased_units_per_month"): "C36",
+    ("revenue_and_leaseup", "renewal_probability_pct"): "C37",
+    ("revenue_and_leaseup", "lease_term_months"): "C38",
+    # Operating expenses
+    ("operating_expenses", "payroll"): "C48",
+    ("operating_expenses", "utilities"): "C49",
+    ("operating_expenses", "turnover"): "C50",
+    ("operating_expenses", "contract_services"): "C51",
+    ("operating_expenses", "repairs_maintenance"): "C52",
+    ("operating_expenses", "leasing_marketing"): "C53",
+    ("operating_expenses", "general_admin"): "C54",
+    ("operating_expenses", "other_expenses"): "C55",
+    ("operating_expenses", "management_fee_pct"): "C58",
+    ("operating_expenses", "insurance"): "C59",
+    ("operating_expenses", "property_taxes"): "C60",
+    ("operating_expenses", "other_taxes_fees"): "C61",
+    ("operating_expenses", "replacement_reserves"): "C64",
     # Senior loan terms
     ("senior_loan_terms", "loan_to_cost_pct"): "F5",
     ("senior_loan_terms", "interest_type"): "F6",
@@ -37,14 +64,23 @@ SCALAR_CELL_MAP: Dict[Tuple[str, str], str] = {
     ("senior_loan_terms", "interest_only_period_months"): "F11",
     ("senior_loan_terms", "amortization_schedule_years"): "F12",
     ("senior_loan_terms", "initial_term_months"): "F13",
-    ("senior_loan_terms", "loan_maturity_months"): "F14",
     ("senior_loan_terms", "origination_fee_pct"): "F15",
     ("senior_loan_terms", "rate_stepdown_dscr_multiple"): "F16",
     ("senior_loan_terms", "rate_stepdown_dy_pct"): "F17",
     ("senior_loan_terms", "stepdown_rate_pct"): "F18",
     ("senior_loan_terms", "exit_fee_pct"): "F20",
+    # Preferred equity terms
+    ("preferred_equity_terms", "has_preferred_equity"): "C93",
+    ("preferred_equity_terms", "loan_to_cost_pct"): "C94",
+    ("preferred_equity_terms", "initial_term_months"): "C95",
+    ("preferred_equity_terms", "interest_type"): "C96",
+    ("preferred_equity_terms", "sofr_spread_pct"): "C97",
+    ("preferred_equity_terms", "sofr_floor_pct"): "C98",
+    ("preferred_equity_terms", "total_interest_rate_pct"): "C99",
+    ("preferred_equity_terms", "minimum_multiple"): "C100",
+    ("preferred_equity_terms", "current_pay_pct"): "C101",
+    ("preferred_equity_terms", "accrual_pct"): "C102",
     # Exit assumptions
-    ("exit_assumptions", "sale_date"): "F24",
     ("exit_assumptions", "sale_month"): "F25",
     ("exit_assumptions", "noi_type"): "F26",
     ("exit_assumptions", "sale_costs_pct"): "F27",
@@ -55,56 +91,42 @@ SCALAR_CELL_MAP: Dict[Tuple[str, str], str] = {
     ("tax_reassessment_at_exit", "property_tax_millage_rate_pct"): "F34",
     ("tax_reassessment_at_exit", "county_assessment_pct"): "F35",
     ("tax_reassessment_at_exit", "market_value_as_pct_of_sale_price"): "F36",
-    # Revenue / opex knobs
-    ("revenue_and_other_income", "vacancy_pct"): "C22",
-    ("revenue_and_other_income", "loss_to_lease_pct"): "C23",
-    ("revenue_and_other_income", "bad_debt_pct"): "C24",
-    ("revenue_and_other_income", "model_units"): "C25",
-    ("revenue_and_other_income", "concessions_lease_up_new_pct"): "C27",
-    ("revenue_and_other_income", "concessions_lease_up_renewal_pct"): "C28",
-    ("revenue_and_other_income", "concessions_stabilized_new_pct"): "C29",
-    ("revenue_and_other_income", "concessions_stabilized_renewal_pct"): "C30",
-    ("revenue_and_other_income", "renewal_probability_pct"): "C37",
-    ("revenue_and_other_income", "lease_term_months"): "C38",
-    ("revenue_and_other_income", "leased_units_per_month"): "C36",
-    # Construction / timeline
-    ("construction_schedule", "actuals_through_date"): "C5",
-    ("construction_schedule", "model_start_date"): "C6",
-    ("construction_schedule", "model_start_month"): "C7",
-    ("construction_schedule", "transaction_closing_date"): "C11",
-    ("construction_schedule", "construction_start_date"): "C12",
-    ("construction_schedule", "construction_start_month"): "C13",
-    ("construction_schedule", "construction_period_months"): "C14",
-    ("construction_schedule", "construction_completion_month"): "C15",
-    ("construction_schedule", "first_units_delivered_month"): "C16",
-    ("construction_schedule", "absorption_start_month"): "C33",
-    ("construction_schedule", "absorption_start_date"): "C34",
-    ("construction_schedule", "last_units_delivered_month"): "C18",
-    ("construction_schedule", "asset_management_model_start_month"): "C7",
-    ("construction_schedule", "asset_management_model_start_date"): "C6",
     # Sources and uses
-    ("sources_and_uses", "senior_loan_amount"): "J5",
-    ("sources_and_uses", "preferred_equity_amount"): "J6",
-    ("sources_and_uses", "investor_equity_amount"): "J7",
-    ("sources_and_uses", "ace_development_equity"): "J8",
-    ("sources_and_uses", "total_sources"): "J9",
-    ("uses", "land_cost"): "J13",
-    ("uses", "hard_costs_total"): "J14",
-    ("uses", "soft_costs_total"): "J15",
-    ("uses", "financing_costs"): "J16",
-    ("uses", "operating_reserve"): "J17",
-    ("uses", "senior_interest_reserve"): "J18",
-    ("uses", "total_uses"): "J19",
+    ("sources_and_uses", "land_acquisition_cost"): "J13",
+    ("sources_and_uses", "hard_costs_total"): "J14",
+    ("sources_and_uses", "soft_costs_total"): "J15",
+    ("sources_and_uses", "financing_costs"): "J16",
+    ("sources_and_uses", "operating_reserve"): "J17",
+    ("sources_and_uses", "senior_interest_reserve"): "J18",
 }
 
 UNIT_MIX_START_ROW = 23
+UNIT_MIX_MAX_ROWS = 6
 UNIT_MIX_COLUMNS = {
     "unit_type": "H",
     "num_units": "I",
     "avg_sf": "J",
     "rent": "K",
-    "rent_psf": "L",
     "original_label": "H",
+}
+
+OTHER_INCOME_START_ROW = 70
+OTHER_INCOME_MAX_ROWS = 16
+OTHER_INCOME_COLUMNS = {
+    "item_name": "B",
+    "num_units": "C",
+    "amount_per_month": "D",
+}
+
+WATERFALL_START_ROW = 45
+WATERFALL_MAX_ROWS = 5
+WATERFALL_COLUMNS = {
+    "tier_name": "H",
+    "lp_split_pct": "I",
+    "gp_split_pct": "J",
+    "hurdle_irr_pct": "L",
+    "moic_multiple": "M",
+    "dollar_amount": "N",
 }
 
 
@@ -144,6 +166,25 @@ def _coerce_value(value: Any) -> Any:
     return value
 
 
+def _is_formula(cell) -> bool:
+    val = cell.value
+    if getattr(cell, "data_type", None) == "f":
+        return True
+    return isinstance(val, str) and val.strip().startswith("=")
+
+
+def _clear_table_rows(
+    ws, start_row: int, max_rows: int, column_map: Dict[str, str], skip_columns: set[str] | None = None
+) -> None:
+    targets = {col for col in column_map.values()}
+    if skip_columns:
+        targets -= set(skip_columns)
+    for idx in range(max_rows):
+        row = start_row + idx
+        for col in targets:
+            ws[f"{col}{row}"].value = None
+
+
 def _apply_scalar_values(ws, mapped: Dict[str, Any], applied: List[ExportAppliedField]) -> None:
     for (table, field), cell in SCALAR_CELL_MAP.items():
         table_val = mapped.get(table)
@@ -153,15 +194,20 @@ def _apply_scalar_values(ws, mapped: Dict[str, Any], applied: List[ExportApplied
         coerced = _coerce_value(raw)
         if coerced is None:
             continue
-        ws[cell].value = coerced
+        cell_obj = ws[cell]
+        if _is_formula(cell_obj):
+            continue
+        cell_obj.value = coerced
         applied.append(ExportAppliedField(table=table, field=field, cell=cell, value=raw))
 
 
 def _apply_unit_mix(ws, mapped: Dict[str, Any], applied: List[ExportAppliedField]) -> None:
     rows = mapped.get("unit_mix")
-    if not isinstance(rows, list):
+    if not isinstance(rows, list) or not rows:
         return
-    for idx, row in enumerate(rows):
+    # Preserve template formulas (e.g., PSF) by not clearing derived columns.
+    _clear_table_rows(ws, UNIT_MIX_START_ROW, UNIT_MIX_MAX_ROWS, UNIT_MIX_COLUMNS, skip_columns={"L"})
+    for idx, row in enumerate(rows[:UNIT_MIX_MAX_ROWS]):
         if not isinstance(row, dict):
             continue
         target_row = UNIT_MIX_START_ROW + idx
@@ -173,8 +219,85 @@ def _apply_unit_mix(ws, mapped: Dict[str, Any], applied: List[ExportAppliedField
             if coerced is None:
                 continue
             cell = f"{col}{target_row}"
-            ws[cell].value = coerced
+            cell_obj = ws[cell]
+            if _is_formula(cell_obj):
+                continue
+            cell_obj.value = coerced
             applied.append(ExportAppliedField(table="unit_mix", field=field, cell=cell, value=raw))
+
+
+def _apply_other_income(ws, mapped: Dict[str, Any], applied: List[ExportAppliedField]) -> None:
+    rows = mapped.get("other_income")
+    if not isinstance(rows, list) or not rows:
+        return
+    _clear_table_rows(ws, OTHER_INCOME_START_ROW, OTHER_INCOME_MAX_ROWS, OTHER_INCOME_COLUMNS)
+    for idx, row in enumerate(rows[:OTHER_INCOME_MAX_ROWS]):
+        if not isinstance(row, dict):
+            continue
+        target_row = OTHER_INCOME_START_ROW + idx
+        item_name = row.get("item_name")
+        if item_name not in (None, ""):
+            cell = f"{OTHER_INCOME_COLUMNS['item_name']}{target_row}"
+            text = str(item_name)
+            cell_obj = ws[cell]
+            if not _is_formula(cell_obj):
+                cell_obj.value = text
+                applied.append(ExportAppliedField(table="other_income", field="item_name", cell=cell, value=item_name))
+        for field, col in OTHER_INCOME_COLUMNS.items():
+            if field == "item_name":
+                continue
+            raw = row.get(field)
+            coerced = _coerce_value(raw)
+            if coerced is None:
+                continue
+            cell = f"{col}{target_row}"
+            cell_obj = ws[cell]
+            if _is_formula(cell_obj):
+                continue
+            cell_obj.value = coerced
+            applied.append(ExportAppliedField(table="other_income", field=field, cell=cell, value=raw))
+
+
+def _apply_waterfall(ws, mapped: Dict[str, Any], applied: List[ExportAppliedField]) -> None:
+    rows = mapped.get("waterfall")
+    if not isinstance(rows, list) or not rows:
+        return
+    _clear_table_rows(ws, WATERFALL_START_ROW, WATERFALL_MAX_ROWS, WATERFALL_COLUMNS)
+    fields_to_write = [
+        "tier_name",
+        "lp_split_pct",
+        "gp_split_pct",
+        "hurdle_irr_pct",
+        "moic_multiple",
+        "dollar_amount",
+    ]
+    for idx, row in enumerate(rows[:WATERFALL_MAX_ROWS]):
+        if not isinstance(row, dict):
+            continue
+        target_row = WATERFALL_START_ROW + idx
+        for field in fields_to_write:
+            col = WATERFALL_COLUMNS.get(field)
+            if not col:
+                continue
+            raw = row.get(field)
+            if field == "tier_name":
+                if raw in (None, ""):
+                    continue
+                text = str(raw)
+                cell_obj = ws[f"{col}{target_row}"]
+                if not _is_formula(cell_obj):
+                    cell_obj.value = text
+                    applied.append(ExportAppliedField(table="waterfall", field=field, cell=f"{col}{target_row}", value=raw))
+                continue
+            coerced = _coerce_value(raw)
+            if coerced is None:
+                continue
+            cell = f"{col}{target_row}"
+            cell_obj = ws[cell]
+            if _is_formula(cell_obj):
+                continue
+            cell_obj.value = coerced
+            applied.append(ExportAppliedField(table="waterfall", field=field, cell=cell, value=raw))
 
 
 def export_mapping(session_id: str, mapping: MappingResult) -> ExportResponse:
@@ -193,6 +316,8 @@ def export_mapping(session_id: str, mapping: MappingResult) -> ExportResponse:
     applied_fields: List[ExportAppliedField] = []
     _apply_scalar_values(ws, mapping.mapped, applied_fields)
     _apply_unit_mix(ws, mapping.mapped, applied_fields)
+    _apply_other_income(ws, mapping.mapped, applied_fields)
+    _apply_waterfall(ws, mapping.mapped, applied_fields)
 
     wb.save(tmp_path)
 
