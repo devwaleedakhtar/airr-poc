@@ -38,47 +38,62 @@ async def upload_workbook(
     # Write to temp
     fd, tmp_path = tempfile.mkstemp(suffix=os.path.splitext(file.filename)[1])
     os.close(fd)
-    content = await file.read()
-    with open(tmp_path, "wb") as f:
-        f.write(content)
-
-    # Discover sheets
-    from openpyxl import load_workbook
-
+    converted_tmp: Optional[str] = None
     try:
-        read_path = _ensure_xlsx(tmp_path)
-        wb = load_workbook(read_path, read_only=True, data_only=True)
-        # Only expose visible sheets in the UI to match analyst expectations
-        sheets = [ws.title for ws in wb.worksheets if getattr(ws, "sheet_state", "visible") == "visible"]
-        wb.close()
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to read workbook: {e}")
+        content = await file.read()
+        with open(tmp_path, "wb") as f:
+            f.write(content)
 
-    # Pre-generate id to use in Cloudinary path
-    workbook_id = await workbooks_repo.generate_id()
+        # Discover sheets
+        from openpyxl import load_workbook
 
-    # Upload original to Cloudinary
-    folder = f"airr-poc/workbooks/{workbook_id}"
-    upload_res = upload_raw(tmp_path, public_id="original", folder=folder)
-    original_url = upload_res.get("secure_url") or upload_res.get("url") or ""
-    original_public_id = upload_res.get("public_id")
-    original_format = upload_res.get("format")
+        try:
+            read_path = _ensure_xlsx(tmp_path)
+            if read_path != tmp_path:
+                converted_tmp = read_path
+            wb = load_workbook(read_path, read_only=True, data_only=True)
+            # Only expose visible sheets in the UI to match analyst expectations
+            sheets = [ws.title for ws in wb.worksheets if getattr(ws, "sheet_state", "visible") == "visible"]
+            wb.close()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to read workbook: {e}")
 
-    # Persist workbook record
-    await workbooks_repo.create(
-        db,
-        {
-            "_id": ObjectId(workbook_id),
-            "filename": file.filename,
-            "content_type": file.content_type,
-            "sheets": sheets,
-            "original_url": original_url,
-            "original_public_id": original_public_id,
-            "original_format": original_format,
-        },
-    )
+        # Pre-generate id to use in Cloudinary path
+        workbook_id = await workbooks_repo.generate_id()
 
-    return UploadWorkbookResponse(workbook_id=workbook_id, sheets=sheets)
+        # Upload original to Cloudinary
+        folder = f"airr-poc/workbooks/{workbook_id}"
+        upload_res = upload_raw(tmp_path, public_id="original", folder=folder)
+        original_url = upload_res.get("secure_url") or upload_res.get("url") or ""
+        original_public_id = upload_res.get("public_id")
+        original_format = upload_res.get("format")
+
+        # Persist workbook record
+        await workbooks_repo.create(
+            db,
+            {
+                "_id": ObjectId(workbook_id),
+                "filename": file.filename,
+                "content_type": file.content_type,
+                "sheets": sheets,
+                "original_url": original_url,
+                "original_public_id": original_public_id,
+                "original_format": original_format,
+            },
+        )
+
+        return UploadWorkbookResponse(workbook_id=workbook_id, sheets=sheets)
+    finally:
+        if converted_tmp and os.path.exists(converted_tmp):
+            try:
+                os.remove(converted_tmp)
+            except FileNotFoundError:
+                pass
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except FileNotFoundError:
+                pass
 
 
 @router.post("/{workbook_id}/convert", response_model=ConvertResponse)
@@ -93,46 +108,61 @@ async def convert_workbook(
     if payload.sheet_name not in doc.get("sheets", []):
         raise HTTPException(status_code=400, detail="Invalid sheet name")
 
-    # Download original
-    original_public_id = doc.get("original_public_id")
-    original_format = doc.get("original_format") or os.path.splitext(doc.get("filename", ""))[1].lstrip(".")
-    if original_public_id:
-        signed = private_download_url(
-            original_public_id,
-            original_format or "",
-            resource_type="raw",
-            type="private",
-        )
-        tmp_xlsx = download_to_temp(signed, suffix=("." + (original_format or "xlsx")))
-    else:
-        tmp_xlsx = download_to_temp(doc["original_url"], suffix=os.path.splitext(doc.get("filename", ""))[1])
-
-    # Convert single sheet to PDF
+    tmp_xlsx: Optional[str] = None
+    pdf_path: Optional[str] = None
     try:
-        result = convert_excel_sheet_to_pdf(tmp_xlsx, payload.sheet_name)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Conversion failed: {e}")
+        # Download original
+        original_public_id = doc.get("original_public_id")
+        original_format = doc.get("original_format") or os.path.splitext(doc.get("filename", ""))[1].lstrip(".")
+        if original_public_id:
+            signed = private_download_url(
+                original_public_id,
+                original_format or "",
+                resource_type="raw",
+                type="private",
+            )
+            tmp_xlsx = download_to_temp(signed, suffix=("." + (original_format or "xlsx")))
+        else:
+            tmp_xlsx = download_to_temp(doc["original_url"], suffix=os.path.splitext(doc.get("filename", ""))[1])
 
-    # Upload PDF to Cloudinary
-    from ..services.converter_service import _slugify  # reuse
+        # Convert single sheet to PDF
+        try:
+            result = convert_excel_sheet_to_pdf(tmp_xlsx, payload.sheet_name)
+            pdf_path = result.pdf_path
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Conversion failed: {e}")
 
-    sheet_slug = _slugify(payload.sheet_name)
-    folder = f"airr-poc/pdfs/{workbook_id}"
-    upload_res = upload_raw(result.pdf_path, public_id=sheet_slug, folder=folder)
-    pdf_url = upload_res.get("secure_url") or upload_res.get("url") or ""
-    pdf_public_id = upload_res.get("public_id")
-    pdf_format = upload_res.get("format") or "pdf"
+        # Upload PDF to Cloudinary
+        from ..services.converter_service import _slugify  # reuse
 
-    await workbooks_repo.set_pdf_for_sheet(
-        db,
-        workbook_id,
-        payload.sheet_name,
-        pdf_url,
-        public_id=pdf_public_id,
-        fmt=pdf_format,
-    )
+        sheet_slug = _slugify(payload.sheet_name)
+        folder = f"airr-poc/pdfs/{workbook_id}"
+        upload_res = upload_raw(pdf_path, public_id=sheet_slug, folder=folder)
+        pdf_url = upload_res.get("secure_url") or upload_res.get("url") or ""
+        pdf_public_id = upload_res.get("public_id")
+        pdf_format = upload_res.get("format") or "pdf"
 
-    return ConvertResponse(pdf_url=pdf_url)
+        await workbooks_repo.set_pdf_for_sheet(
+            db,
+            workbook_id,
+            payload.sheet_name,
+            pdf_url,
+            public_id=pdf_public_id,
+            fmt=pdf_format,
+        )
+
+        return ConvertResponse(pdf_url=pdf_url)
+    finally:
+        if pdf_path and os.path.exists(pdf_path):
+            try:
+                os.remove(pdf_path)
+            except FileNotFoundError:
+                pass
+        if tmp_xlsx and os.path.exists(tmp_xlsx):
+            try:
+                os.remove(tmp_xlsx)
+            except FileNotFoundError:
+                pass
 
 
 @router.post("/{workbook_id}/extract", response_model=ExtractResponse)
@@ -163,45 +193,53 @@ async def extract_workbook(
     if not pdf_url:
         raise HTTPException(status_code=400, detail="No PDF found for extraction. Convert a sheet first or provide sheet_name.")
 
-    # Download PDF
-    if pdf_public_ids.get(sheet_name):
-        signed = private_download_url(
-            pdf_public_ids[sheet_name],
-            pdf_formats.get(sheet_name) or "pdf",
-            resource_type="raw",
-            type="private",
-        )
-        tmp_pdf = download_to_temp(signed, suffix=".pdf")
-    else:
-        tmp_pdf = download_to_temp(pdf_url, suffix=".pdf")
-
-    # Extract
+    tmp_pdf: Optional[str] = None
     try:
-        result = extract_from_pdf(tmp_pdf)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Extraction failed: {e}")
+        # Download PDF
+        if pdf_public_ids.get(sheet_name):
+            signed = private_download_url(
+                pdf_public_ids[sheet_name],
+                pdf_formats.get(sheet_name) or "pdf",
+                resource_type="raw",
+                type="private",
+            )
+            tmp_pdf = download_to_temp(signed, suffix=".pdf")
+        else:
+            tmp_pdf = download_to_temp(pdf_url, suffix=".pdf")
 
-    # Persist session
-    from ..repositories import sessions_repo
+        # Extract
+        try:
+            result = extract_from_pdf(tmp_pdf)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Extraction failed: {e}")
 
-    session_id = await sessions_repo.create(
-        db,
-        {
-            "workbook_id": workbook_id,
-            "sheet_name": sheet_name,
-            "pdf_url": pdf_url,
-            "extracted_json": result.extracted_json,
-            "confidences": result.confidences,
-            "inferred_tables": result.inferred_tables,
-            "warnings": result.warnings,
-            "text_snippets": result.text_snippets,
-        },
-    )
+        # Persist session
+        from ..repositories import sessions_repo
 
-    return ExtractResponse(
-        session_id=session_id,
-        extracted_json=result.extracted_json,
-        confidences=result.confidences,
-        inferred_tables=result.inferred_tables,
-        warnings=result.warnings,
-    )
+        session_id = await sessions_repo.create(
+            db,
+            {
+                "workbook_id": workbook_id,
+                "sheet_name": sheet_name,
+                "pdf_url": pdf_url,
+                "extracted_json": result.extracted_json,
+                "confidences": result.confidences,
+                "inferred_tables": result.inferred_tables,
+                "warnings": result.warnings,
+                "text_snippets": result.text_snippets,
+            },
+        )
+
+        return ExtractResponse(
+            session_id=session_id,
+            extracted_json=result.extracted_json,
+            confidences=result.confidences,
+            inferred_tables=result.inferred_tables,
+            warnings=result.warnings,
+        )
+    finally:
+        if tmp_pdf and os.path.exists(tmp_pdf):
+            try:
+                os.remove(tmp_pdf)
+            except FileNotFoundError:
+                pass

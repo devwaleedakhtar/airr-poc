@@ -59,30 +59,33 @@ def _autofit_columns(ws) -> None:
 def _convert_xls_to_xlsx(xls_path: str) -> str:
     """Convert legacy .xls to .xlsx using LibreOffice and return a temp .xlsx path."""
     out_dir = tempfile.mkdtemp()
-    soffice = _find_soffice_binary()
-    cmd = [
-        soffice,
-        "--headless",
-        "--convert-to",
-        "xlsx",
-        "--outdir",
-        out_dir,
-        xls_path,
-    ]
-    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    base = os.path.splitext(os.path.basename(xls_path))[0]
-    candidate = os.path.join(out_dir, f"{base}.xlsx")
-    if not os.path.exists(candidate):
-        for name in os.listdir(out_dir):
-            if name.lower().endswith(".xlsx"):
-                candidate = os.path.join(out_dir, name)
-                break
-    if not os.path.exists(candidate):
-        raise RuntimeError("XLS to XLSX conversion failed: no XLSX produced")
-    fd, final_path = tempfile.mkstemp(suffix=".xlsx")
-    os.close(fd)
-    shutil.move(candidate, final_path)
-    return final_path
+    try:
+        soffice = _find_soffice_binary()
+        cmd = [
+            soffice,
+            "--headless",
+            "--convert-to",
+            "xlsx",
+            "--outdir",
+            out_dir,
+            xls_path,
+        ]
+        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        base = os.path.splitext(os.path.basename(xls_path))[0]
+        candidate = os.path.join(out_dir, f"{base}.xlsx")
+        if not os.path.exists(candidate):
+            for name in os.listdir(out_dir):
+                if name.lower().endswith(".xlsx"):
+                    candidate = os.path.join(out_dir, name)
+                    break
+        if not os.path.exists(candidate):
+            raise RuntimeError("XLS to XLSX conversion failed: no XLSX produced")
+        fd, final_path = tempfile.mkstemp(suffix=".xlsx")
+        os.close(fd)
+        shutil.move(candidate, final_path)
+        return final_path
+    finally:
+        shutil.rmtree(out_dir, ignore_errors=True)
 
 def _ensure_xlsx(src_path: str) -> str:
     """Ensure the returned path is .xlsx/.xlsm; convert .xls if needed for openpyxl."""
@@ -104,7 +107,18 @@ def _prepare_single_sheet_workbook(src_path: str, sheet_name: str) -> str:
     keep_vba = ext == ".xlsm"
 
     processed_src = _ensure_xlsx(src_path)
+    temp_conversion = processed_src if processed_src != src_path else None
     wb = load_workbook(filename=processed_src, keep_vba=keep_vba, data_only=False)
+
+    # Force a full recalculation when LibreOffice opens the workbook so formula
+    # values (including cross-sheet references) render in the PDF.
+    try:
+        wb.calculation_properties.fullCalcOnLoad = True
+        wb.calculation_properties.calcMode = "auto"
+        wb.calculation_properties.forceFullCalculation = True
+    except Exception:
+        pass
+
     if sheet_name not in wb.sheetnames:
         raise ValueError(f"Sheet '{sheet_name}' not found in workbook")
 
@@ -142,6 +156,11 @@ def _prepare_single_sheet_workbook(src_path: str, sheet_name: str) -> str:
     fd, tmp_path = tempfile.mkstemp(suffix=suffix)
     os.close(fd)
     wb.save(tmp_path)
+    if temp_conversion and os.path.exists(temp_conversion):
+        try:
+            os.remove(temp_conversion)
+        except FileNotFoundError:
+            pass
     return tmp_path
 
 
@@ -158,36 +177,45 @@ def _find_soffice_binary() -> str:
 
 def _convert_xlsx_to_pdf(xlsx_path: str) -> str:
     out_dir = tempfile.mkdtemp()
-    soffice = _find_soffice_binary()
-    cmd = [
-        soffice,
-        "--headless",
-        "--convert-to",
-        "pdf:calc_pdf_Export:UseLosslessCompression=true,Quality=100,ReduceImageResolution=false",
-        "--outdir",
-        out_dir,
-        xlsx_path,
-    ]
-    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    # find generated pdf
-    base = os.path.splitext(os.path.basename(xlsx_path))[0]
-    pdf_candidate = os.path.join(out_dir, f"{base}.pdf")
-    if not os.path.exists(pdf_candidate):
-        # fallback: first pdf in out_dir
-        for name in os.listdir(out_dir):
-            if name.lower().endswith(".pdf"):
-                pdf_candidate = os.path.join(out_dir, name)
-                break
-    if not os.path.exists(pdf_candidate):
-        raise RuntimeError("PDF conversion failed: no PDF produced")
-    # move to a stable temp file
-    fd, final_path = tempfile.mkstemp(suffix=".pdf")
-    os.close(fd)
-    shutil.move(pdf_candidate, final_path)
-    return final_path
+    try:
+        soffice = _find_soffice_binary()
+        cmd = [
+            soffice,
+            "--headless",
+            "--convert-to",
+            "pdf:calc_pdf_Export:UseLosslessCompression=true,Quality=100,ReduceImageResolution=false",
+            "--outdir",
+            out_dir,
+            xlsx_path,
+        ]
+        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # find generated pdf
+        base = os.path.splitext(os.path.basename(xlsx_path))[0]
+        pdf_candidate = os.path.join(out_dir, f"{base}.pdf")
+        if not os.path.exists(pdf_candidate):
+            # fallback: first pdf in out_dir
+            for name in os.listdir(out_dir):
+                if name.lower().endswith(".pdf"):
+                    pdf_candidate = os.path.join(out_dir, name)
+                    break
+        if not os.path.exists(pdf_candidate):
+            raise RuntimeError("PDF conversion failed: no PDF produced")
+        # move to a stable temp file
+        fd, final_path = tempfile.mkstemp(suffix=".pdf")
+        os.close(fd)
+        shutil.move(pdf_candidate, final_path)
+        return final_path
+    finally:
+        shutil.rmtree(out_dir, ignore_errors=True)
 
 
 def convert_excel_sheet_to_pdf(src_xlsx_path: str, sheet_name: str) -> ConversionResult:
     single_sheet_path = _prepare_single_sheet_workbook(src_xlsx_path, sheet_name)
-    pdf_path = _convert_xlsx_to_pdf(single_sheet_path)
+    try:
+        pdf_path = _convert_xlsx_to_pdf(single_sheet_path)
+    finally:
+        try:
+            os.remove(single_sheet_path)
+        except FileNotFoundError:
+            pass
     return ConversionResult(pdf_path=pdf_path)

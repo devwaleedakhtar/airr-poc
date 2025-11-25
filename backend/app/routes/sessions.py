@@ -4,11 +4,13 @@ import asyncio
 from datetime import datetime
 from typing import Any, Dict
 
+from cloudinary.utils import private_download_url
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import RedirectResponse
 
 from ..core.db import db_dependency
 from ..core.db import get_db
-from ..repositories import sessions_repo
+from ..repositories import sessions_repo, workbooks_repo
 from ..schemas.mapping import MappingJobStatus, MappingResult
 from ..schemas.sessions import (
     ExportResponse,
@@ -71,6 +73,49 @@ async def update_session(session_id: str, payload: UpdateSessionRequest, db=Depe
     if not doc:
         raise HTTPException(status_code=404, detail="Session not found after update")
     return doc
+
+
+@router.get("/{session_id}/pdf")
+async def get_session_pdf(session_id: str, db=Depends(db_dependency)):
+    """Return a signed, browser-friendly download URL for the session's source PDF.
+
+    We resolve the workbook + sheet from the session, look up the stored Cloudinary
+    public_id/format, and generate a fresh private_download_url. If the workbook
+    has no stored public_id for this sheet, we fall back to the persisted pdf_url.
+    """
+    session = await sessions_repo.get(db, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    workbook_id = session.get("workbook_id")
+    sheet_name = session.get("sheet_name")
+    if not workbook_id or not sheet_name:
+        raise HTTPException(status_code=400, detail="Session is missing workbook_id or sheet_name")
+
+    workbook = await workbooks_repo.get(db, workbook_id)
+    if not workbook:
+        raise HTTPException(status_code=404, detail="Workbook not found")
+
+    pdf_public_ids = workbook.get("pdf_public_ids", {}) or {}
+    pdf_formats = workbook.get("pdf_formats", {}) or {}
+    public_id = pdf_public_ids.get(sheet_name)
+    fmt = pdf_formats.get(sheet_name) or "pdf"
+
+    if public_id:
+        signed_url = private_download_url(
+            public_id,
+            fmt,
+            resource_type="raw",
+            type="private",
+        )
+        return RedirectResponse(url=signed_url, status_code=302)
+
+    # Fallback: use the persisted URL if we don't have a stored public_id.
+    pdf_url = session.get("pdf_url")
+    if not pdf_url:
+        raise HTTPException(status_code=400, detail="No PDF stored for this session")
+
+    return RedirectResponse(url=pdf_url, status_code=302)
 
 
 @router.post("/{session_id}/map", response_model=MappingResult)

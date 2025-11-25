@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { SessionDetail } from "@/types/extraction";
 import type { JsonValue } from "@/types/json";
-import { updateSession } from "@/lib/api";
+import { API_BASE, updateSession } from "@/lib/api";
 import { groupExtracted, toNestedJson } from "./utils";
 import type { ReviewTable } from "./types";
 import { Button } from "@/components/ui/button";
@@ -67,8 +67,23 @@ export default function ReviewEditor({ session }: Props) {
   return (
     <div className="space-y-4">
       <div className="space-y-4">
-        <H1 className="text-2xl">Review & Fix</H1>
-        <P>Fill missing or low-confidence fields. Use the snippet panel for context.</P>
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <H1 className="text-2xl">Review & Fix</H1>
+            <P>Fill missing or low-confidence fields. Use the snippet panel for context.</P>
+          </div>
+          {session.pdf_url && (
+            <Button asChild variant="outline" size="sm">
+              <a
+                href={`${API_BASE}/sessions/${session._id}/pdf`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Download PDF
+              </a>
+            </Button>
+          )}
+        </div>
         <Accordion type="multiple" className="rounded border divide-y">
           {tables.map((t, ti) => (
             <AccordionItem key={t.name} value={t.name}>
