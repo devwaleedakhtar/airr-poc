@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from .mapping import MappingResult
+from .mapping import MappingJobStatus, MappingResult
 
 
 class ExportAppliedField(BaseModel):
@@ -32,6 +32,7 @@ class SessionModel(BaseModel):
     text_snippets: Optional[Dict[str, str]] = None
     final_json: Optional[Dict[str, Any]] = None
     mapping: Optional[MappingResult] = None
+    mapping_job: Optional[MappingJobStatus] = None
     created_at: datetime
     updated_at: datetime
 

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+import logging
+import sys
+from datetime import datetime, timezone
 from functools import lru_cache
 from hashlib import sha1
 from pathlib import Path
@@ -10,6 +12,10 @@ from typing import Any, Dict, List
 import yaml
 from openai import OpenAI
 from pydantic import ValidationError
+try:
+    import tiktoken
+except ImportError:
+    tiktoken = None
 
 from ..core.config import settings
 from ..schemas.mapping import MappingMetadata, MappingResult, MissingField
@@ -17,6 +23,13 @@ from ..schemas.mapping import MappingMetadata, MappingResult, MissingField
 BASE_DIR = Path(__file__).resolve().parents[1]
 MODEL_SCHEMA_PATH = BASE_DIR / "constants" / "model_schema.yaml"
 MAPPING_PROMPT_PATH = BASE_DIR / "prompts" / "mapping_prompt.txt"
+logger = logging.getLogger(__name__)
+# Ensure mapping logs emit at INFO even when the root logger is stricter.
+if not logger.handlers:
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(logging.INFO)
+    logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 
 def _raw_schema_text() -> str:
@@ -295,11 +308,31 @@ def _json_safe(text: str) -> Dict[str, Any]:
     return {}
 
 
+def _count_prompt_tokens(text: str) -> int | None:
+    """Best-effort prompt token count to debug latency/size."""
+    if not tiktoken:
+        return None
+    try:
+        try:
+            enc = tiktoken.encoding_for_model(settings.model_name)
+        except Exception:
+            enc = tiktoken.get_encoding("cl100k_base")
+        return len(enc.encode(text or ""))
+    except Exception:
+        return None
+
+
 def map_to_canonical(source_json: Dict[str, Any]) -> MappingResult:
     if not source_json:
         raise ValueError("Source JSON is empty; cannot perform mapping.")
 
     prompt = _build_prompt(source_json)
+    tokens = _count_prompt_tokens(prompt)
+    if tokens is not None:
+        logger.info("mapping prompt tokens=%s model=%s", tokens, settings.model_name)
+    else:
+        logger.info("mapping prompt tokens=unknown (tiktoken unavailable) model=%s", settings.model_name)
+    start = datetime.now(timezone.utc)
     client = OpenAI(
         api_key=settings.model_api_key,
         base_url=settings.model_base_url,
@@ -308,7 +341,7 @@ def map_to_canonical(source_json: Dict[str, Any]) -> MappingResult:
     response = client.chat.completions.create(
         model=settings.model_name,
         temperature=0.0,
-        response_format={"type": "json_object"},
+        #response_format={"type": "json_object"},
         messages=[
             {
                 "role": "system",
@@ -317,6 +350,8 @@ def map_to_canonical(source_json: Dict[str, Any]) -> MappingResult:
             {"role": "user", "content": prompt},
         ],
     )
+    duration_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
+    logger.info("mapping completion latency_ms=%.0f model=%s", duration_ms, settings.model_name)
     content = response.choices[0].message.content if response.choices else "{}"
     payload = _json_safe(content or "{}")
     if not payload:

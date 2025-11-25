@@ -11,7 +11,7 @@ import type {
   ExtractedJson,
   Confidences,
 } from "@/types/extraction";
-import type { ExportResult, MappingResult } from "@/types/mapping";
+import type { ExportResult, MappingJobStatus, MappingResult } from "@/types/mapping";
 
 export type ExtractResponse = {
   session_id: string;
@@ -131,6 +131,19 @@ export async function saveMapping(sessionId: string, mapping: MappingResult): Pr
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(mapping),
   });
+  return json(res);
+}
+
+export async function startMappingJob(sessionId: string): Promise<MappingJobStatus> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/map/async`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  return json(res);
+}
+
+export async function getMappingStatus(sessionId: string): Promise<MappingJobStatus> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/mapping/status`, { cache: "no-store" });
   return json(res);
 }
 

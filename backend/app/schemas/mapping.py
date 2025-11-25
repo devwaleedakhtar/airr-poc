@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Literal
 
 from pydantic import BaseModel, Field
 
@@ -54,3 +54,11 @@ class MappingResult(BaseModel):
     )
     missing_fields: List[MissingField] = Field(default_factory=list)
     metadata: MappingMetadata = Field(default_factory=MappingMetadata)
+
+
+class MappingJobStatus(BaseModel):
+    status: Literal["pending", "running", "succeeded", "failed"]
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    error: Optional[str] = None
+    mapping: Optional[MappingResult] = None

@@ -37,3 +37,11 @@ export type ExportResult = {
   download_url: string;
   applied_fields: ExportAppliedField[];
 };
+
+export type MappingJobStatus = {
+  status: "pending" | "running" | "succeeded" | "failed";
+  started_at?: string | null;
+  completed_at?: string | null;
+  error?: string | null;
+  mapping?: MappingResult | null;
+};

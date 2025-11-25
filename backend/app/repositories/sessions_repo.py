@@ -55,3 +55,14 @@ async def set_mapping(
         {"_id": ObjectId(session_id)},
         {"$set": {"mapping": payload, "updated_at": datetime.utcnow()}},
     )
+
+
+async def set_mapping_job(
+    db: AsyncIOMotorDatabase,
+    session_id: str,
+    job: Dict[str, Any],
+) -> None:
+    await db[COLLECTION].update_one(
+        {"_id": ObjectId(session_id)},
+        {"$set": {"mapping_job": job, "updated_at": datetime.utcnow()}},
+    )

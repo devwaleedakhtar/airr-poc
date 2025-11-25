@@ -1,11 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { exportWorkbook, mapSession, saveMapping } from "@/lib/api";
+import {
+  exportWorkbook,
+  getMappingStatus,
+  saveMapping,
+  startMappingJob,
+} from "@/lib/api";
 import type {
   ExportResult,
   MappingResult,
+  MappingJobStatus,
   MissingField,
 } from "@/types/mapping";
 import type { JsonValue } from "@/types/json";
@@ -66,31 +72,90 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
   const [exporting, setExporting] = useState(false);
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [jobStatus, setJobStatus] = useState<MappingJobStatus | null>(null);
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollAttempts = useRef(0);
   const tableLabels = mapping?.metadata?.table_labels ?? {};
   const fieldLabels = mapping?.metadata?.field_labels ?? {};
+  const isMappingRunning =
+    loading || jobStatus?.status === "running" || jobStatus?.status === "pending";
 
-  const fetchMapping = useCallback(async () => {
+  const stopPolling = useCallback(() => {
+    if (pollTimer.current) {
+      clearTimeout(pollTimer.current);
+      pollTimer.current = null;
+    }
+    pollAttempts.current = 0;
+  }, []);
+
+  const pollStatus = useCallback(async () => {
+    try {
+      const status = await getMappingStatus(sessionId);
+      setJobStatus(status);
+      if (status.status === "succeeded") {
+        if (status.mapping) {
+          setMapping(status.mapping);
+          setDirty(false);
+        }
+        setLoading(false);
+        stopPolling();
+        return;
+      }
+      if (status.status === "failed") {
+        const msg = status.error || "Mapping failed";
+        setError(msg);
+        toast.error("Mapping failed", { description: msg });
+        setLoading(false);
+        stopPolling();
+        return;
+      }
+      pollAttempts.current += 1;
+      // Cap ~500s: 50 attempts * 10s interval
+      if (pollAttempts.current >= 50) {
+        const msg = "Mapping is taking longer than expected. Please retry.";
+        setError(msg);
+        setJobStatus({ status: "failed", error: msg });
+        stopPolling();
+        setLoading(false);
+        return;
+      }
+      pollTimer.current = setTimeout(pollStatus, 10000);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to check mapping status";
+      setError(msg);
+      toast.error("Mapping status error", { description: msg });
+      stopPolling();
+      setLoading(false);
+    }
+  }, [sessionId, stopPolling]);
+
+  const beginMappingJob = useCallback(async () => {
+    stopPolling();
     setLoading(true);
     setError(null);
     setMapping(null);
+    setDirty(false);
     try {
-      const result = await mapSession(sessionId);
-      setMapping(result);
-      setDirty(false);
+      const status = await startMappingJob(sessionId);
+      setJobStatus(status);
+      pollStatus();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to map session";
+      const msg = err instanceof Error ? err.message : "Failed to start mapping";
       setError(msg);
       toast.error("Mapping failed", { description: msg });
-    } finally {
       setLoading(false);
     }
-  }, [sessionId]);
+  }, [pollStatus, sessionId, stopPolling]);
 
   useEffect(() => {
     if (!initialMapping) {
-      fetchMapping();
+      beginMappingJob();
     }
-  }, [initialMapping, fetchMapping]);
+  }, [beginMappingJob, initialMapping]);
+
+  useEffect(() => {
+    return () => stopPolling();
+  }, [stopPolling]);
 
   const updateField = (table: string, field: string, value: JsonValue) => {
     setMapping((prev) => {
@@ -222,11 +287,16 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
                 {new Date(mapping.metadata.generated_at).toLocaleString()}
               </P>
             )}
+            {jobStatus?.status === "running" && (
+              <div className="mt-2">
+                <Badge variant="secondary">Mapping in progress, this can take some time...</Badge>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Button variant="outline" onClick={fetchMapping} disabled={loading}>
-              {loading && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-              {loading ? "Running..." : "Regenerate Mapping"}
+            <Button variant="outline" onClick={beginMappingJob} disabled={isMappingRunning}>
+              {isMappingRunning && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              {isMappingRunning ? "Running..." : "Regenerate Mapping"}
             </Button>
             <Button
               variant="outline"
@@ -250,14 +320,14 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
                   setExporting(false);
                 }
               }}
-              disabled={!mapping || exporting || loading}
+              disabled={!mapping || exporting || isMappingRunning}
             >
               {exporting && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
               {exporting ? "Generating..." : "Generate Excel"}
             </Button>
             <Button
               onClick={handleSave}
-              disabled={!mapping || saving || !dirty}
+              disabled={!mapping || saving || !dirty || isMappingRunning}
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
               {saving ? "Saving..." : "Save Mapping"}
