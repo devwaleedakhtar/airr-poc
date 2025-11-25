@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import datetime
 from typing import Any, Dict
 
 from cloudinary.utils import private_download_url
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi.responses import FileResponse, RedirectResponse
 
+from ..core.cloudinary import download_to_temp
 from ..core.db import db_dependency
 from ..core.db import get_db
 from ..repositories import sessions_repo, workbooks_repo
@@ -19,6 +21,7 @@ from ..schemas.sessions import (
     SessionModel,
 )
 from ..services import mapping_service, workbook_export_service
+from ..services.pdf_image_service import pdf_to_image
 
 
 async def _run_mapping_job(session_id: str, source: Dict[str, Any]) -> None:
@@ -116,6 +119,96 @@ async def get_session_pdf(session_id: str, db=Depends(db_dependency)):
         raise HTTPException(status_code=400, detail="No PDF stored for this session")
 
     return RedirectResponse(url=pdf_url, status_code=302)
+
+
+@router.get("/{session_id}/image")
+async def get_session_image(
+    session_id: str,
+    background_tasks: BackgroundTasks,
+    db=Depends(db_dependency),
+):
+    session = await sessions_repo.get(db, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    workbook_id = session.get("workbook_id")
+    sheet_name = session.get("sheet_name")
+    if not workbook_id or not sheet_name:
+        raise HTTPException(status_code=400, detail="Session is missing workbook_id or sheet_name")
+
+    workbook = await workbooks_repo.get(db, workbook_id)
+    if not workbook:
+        raise HTTPException(status_code=404, detail="Workbook not found")
+
+    pdfs = workbook.get("pdfs", {}) or {}
+    pdf_public_ids = workbook.get("pdf_public_ids", {}) or {}
+    pdf_formats = workbook.get("pdf_formats", {}) or {}
+
+    pdf_url = pdfs.get(sheet_name) or session.get("pdf_url")
+    if not pdf_url and not pdf_public_ids.get(sheet_name):
+        raise HTTPException(status_code=400, detail="No PDF stored for this session")
+
+    tmp_pdf: str | None = None
+    image_path: str | None = None
+
+    try:
+        # Download PDF using signed private URL when possible.
+        if pdf_public_ids.get(sheet_name):
+            signed = private_download_url(
+                pdf_public_ids[sheet_name],
+                pdf_formats.get(sheet_name) or "pdf",
+                resource_type="raw",
+                type="private",
+            )
+            tmp_pdf = download_to_temp(signed, suffix=".pdf")
+        elif pdf_url:
+            tmp_pdf = download_to_temp(pdf_url, suffix=".pdf")
+        else:
+            raise HTTPException(status_code=400, detail="No PDF stored for this session")
+
+        image_path = pdf_to_image(tmp_pdf)
+
+        def _cleanup(pdf_path: str | None, img_path: str | None) -> None:
+            for path in (pdf_path, img_path):
+                if path and os.path.exists(path):
+                    try:
+                        os.remove(path)
+                    except FileNotFoundError:
+                        pass
+
+        background_tasks.add_task(_cleanup, tmp_pdf, image_path)
+
+        filename = f"{sheet_name}.png"
+        return FileResponse(
+            image_path,
+            media_type="image/png",
+            filename=filename,
+            background=background_tasks,
+        )
+    except HTTPException:
+        if tmp_pdf and os.path.exists(tmp_pdf):
+            try:
+                os.remove(tmp_pdf)
+            except FileNotFoundError:
+                pass
+        if image_path and os.path.exists(image_path):
+            try:
+                os.remove(image_path)
+            except FileNotFoundError:
+                pass
+        raise
+    except Exception as exc:
+        if tmp_pdf and os.path.exists(tmp_pdf):
+            try:
+                os.remove(tmp_pdf)
+            except FileNotFoundError:
+                pass
+        if image_path and os.path.exists(image_path):
+            try:
+                os.remove(image_path)
+            except FileNotFoundError:
+                pass
+        raise HTTPException(status_code=500, detail=f"Failed to generate image: {exc}")
 
 
 @router.post("/{session_id}/map", response_model=MappingResult)

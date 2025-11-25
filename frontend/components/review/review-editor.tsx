@@ -73,15 +73,26 @@ export default function ReviewEditor({ session }: Props) {
             <P>Fill missing or low-confidence fields. Use the snippet panel for context.</P>
           </div>
           {session.pdf_url && (
-            <Button asChild variant="outline" size="sm">
-              <a
-                href={`${API_BASE}/sessions/${session._id}/pdf`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Download PDF
-              </a>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button asChild variant="outline" size="sm">
+                <a
+                  href={`${API_BASE}/sessions/${session._id}/pdf`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Download PDF
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <a
+                  href={`${API_BASE}/sessions/${session._id}/image`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Download Image
+                </a>
+              </Button>
+            </div>
           )}
         </div>
         <Accordion type="multiple" className="rounded border divide-y">
