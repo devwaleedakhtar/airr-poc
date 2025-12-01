@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from ..core.cloudinary import download_to_temp, upload_raw
 from cloudinary.utils import private_download_url
 from ..core.db import db_dependency
+from ..core.config import settings
 from ..repositories import workbooks_repo
 from ..schemas.workbooks import (
     ConvertRequest,
@@ -20,6 +21,7 @@ from ..schemas.workbooks import (
 )
 from ..services.converter_service import convert_excel_sheet_to_pdf
 from ..services.converter_service import _ensure_xlsx
+from ..services import o365_converter_service
 
 
 router = APIRouter(prefix="/workbooks", tags=["workbooks"])
@@ -111,7 +113,7 @@ async def convert_workbook(
     tmp_xlsx: Optional[str] = None
     pdf_path: Optional[str] = None
     try:
-        # Download original
+        # Download original (used for LibreOffice path; Office 365 path streams via Graph)
         original_public_id = doc.get("original_public_id")
         original_format = doc.get("original_format") or os.path.splitext(doc.get("filename", ""))[1].lstrip(".")
         if original_public_id:
@@ -125,10 +127,31 @@ async def convert_workbook(
         else:
             tmp_xlsx = download_to_temp(doc["original_url"], suffix=os.path.splitext(doc.get("filename", ""))[1])
 
-        # Convert single sheet to PDF
+        # Convert single sheet to PDF using configured backend
         try:
-            result = convert_excel_sheet_to_pdf(tmp_xlsx, payload.sheet_name)
+            backend = (settings.converter_backend or "libreoffice").lower()
+            result = None
+
+            if backend in ("office365", "o365", "graph", "hybrid"):
+                try:
+                    result = o365_converter_service.convert_via_office365(
+                        doc,
+                        workbook_id,
+                        payload.sheet_name,
+                    )
+                except Exception:
+                    if backend == "hybrid" and tmp_xlsx:
+                        result = convert_excel_sheet_to_pdf(tmp_xlsx, payload.sheet_name)
+                    else:
+                        raise
+            else:
+                result = convert_excel_sheet_to_pdf(tmp_xlsx, payload.sheet_name)
+
             pdf_path = result.pdf_path
+
+            graph_item_id = getattr(result, "graph_item_id", None)
+            if graph_item_id:
+                await workbooks_repo.set_graph_item_id(db, workbook_id, graph_item_id)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Conversion failed: {e}")
 

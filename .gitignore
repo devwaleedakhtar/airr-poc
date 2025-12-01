@@ -26,5 +26,11 @@
 /backend/alembic.ini.example.bak.5
 /backend/alembic.ini.example.bak.6
 /backend/.env.local
+
+# Python cache artifacts (ignore all __pycache__ folders and compiled files)
+__pycache__/
+*.py[cod]
+
 ./dev
 dev
+dev/
