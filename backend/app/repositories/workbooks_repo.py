@@ -55,3 +55,14 @@ async def set_pdf_for_sheet(
 async def list_sheets(db: AsyncIOMotorDatabase, workbook_id: str) -> List[str]:
     doc = await get(db, workbook_id)
     return doc.get("sheets", []) if doc else []
+
+
+async def set_graph_item_id(
+    db: AsyncIOMotorDatabase,
+    workbook_id: str,
+    graph_item_id: str,
+) -> None:
+    await db[COLLECTION].update_one(
+        {"_id": ObjectId(workbook_id)},
+        {"$set": {"graph_item_id": graph_item_id}},
+    )

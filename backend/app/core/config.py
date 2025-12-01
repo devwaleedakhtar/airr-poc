@@ -22,6 +22,17 @@ class Settings(BaseSettings):
     # LibreOffice
     libreoffice_path: str | None = Field(default=None, alias="LIBREOFFICE_PATH")
 
+    # Microsoft Graph / Office 365
+    graph_tenant_id: str = Field(..., alias="GRAPH_TENANT_ID")
+    graph_client_id: str = Field(..., alias="GRAPH_CLIENT_ID")
+    graph_client_secret: str = Field(..., alias="GRAPH_CLIENT_SECRET")
+    graph_client_secret_id: str | None = Field(default=None, alias="GRAPH_CLIENT_SECRET_ID")
+    graph_drive_id: str = Field(..., alias="GRAPH_DRIVE_ID")
+    graph_base_url: str = Field(default="https://graph.microsoft.com/v1.0", alias="GRAPH_BASE_URL")
+
+    # Conversion backend selector
+    converter_backend: str = Field(default="libreoffice", alias="CONVERTER_BACKEND")
+
     class Config:
         env_file = ".env.local"
         env_file_encoding = "utf-8"

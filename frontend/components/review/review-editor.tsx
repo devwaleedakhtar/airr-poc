@@ -18,6 +18,8 @@ type Props = {
   session: SessionDetail;
 };
 
+const SHOW_PDF_ACTIONS = false;
+
 function confidenceColor(level?: string) {
   switch (level) {
     case "high":
@@ -72,7 +74,7 @@ export default function ReviewEditor({ session }: Props) {
             <H1 className="text-2xl">Review & Fix</H1>
             <P>Fill missing or low-confidence fields. Use the snippet panel for context.</P>
           </div>
-          {session.pdf_url && (
+          {SHOW_PDF_ACTIONS && session.pdf_url && (
             <div className="flex items-center gap-2">
               <Button asChild variant="outline" size="sm">
                 <a

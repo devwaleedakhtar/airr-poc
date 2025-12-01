@@ -15,23 +15,24 @@ model_schema:
   # --------------------------------------------------------------------------
   conventions:
     percent_fields:
-      storage: "percentage_points"          # 2.5 == 2.5%
+      storage: "percentage_points" # 2.5 == 2.5%
     currency_fields:
       currency: "USD"
       storage: "absolute_dollars"
     duration_fields:
       units_note: "duration fields specify the number of months or years"
     roles:
-      - input               # AI must map/populate from source model
-      - derived_input       # can be computed from other mapped fields
-      - calculated_output   # calculated by the client model; AI MAY read but not set
-      - ignore              # AI should not search for or attempt to map
+      - input # AI must map/populate from source model
+      - derived_input # can be computed from other mapped fields
+      - calculated_output # calculated by the client model; AI MAY read but not set
+      - ignore # AI should not search for or attempt to map
 
   # --------------------------------------------------------------------------
   # SECTION: UNIT MIX
   # --------------------------------------------------------------------------
   unit_mix:
     kind: "table"
+    label: "Unit Mix"
     description: >
       The aggregate mix of unit types in an apartment building project.
       The column structure is always the same, but unit type NAMES vary
@@ -96,7 +97,7 @@ model_schema:
         example: 1875
 
       rent_psf:
-        label: "Rent PSF"
+        label: "PSF"
         aliases:
           - "$/SF"
           - "Rent/SF"
@@ -116,7 +117,7 @@ model_schema:
   # --------------------------------------------------------------------------
   growth_assumptions:
     kind: "scalar_group"
-    label: "Operations Assumptions / Trending / Growth Assumptions"
+    label: "Growth"
     description: "Growth assumptions for revenue and expenses in the model."
     fields:
       market_rent_growth:
@@ -209,7 +210,7 @@ model_schema:
       Waterfall structure governing how cash flows are split between limited
       partner (LP) and general partner (GP) across IRR / MOIC hurdles.
     row_key_field: "tier_name"
-    row_match_strategy: "ordered_tiers"   # Tier 1 .. Tier 5
+    row_match_strategy: "ordered_tiers" # Tier 1 .. Tier 5
     tier_order:
       - "Tier 1"
       - "Tier 2"
@@ -230,7 +231,7 @@ model_schema:
         description: "Name/level of the hurdle."
 
       lp_split_pct:
-        label: "LP Split %"
+        label: "LP"
         aliases:
           - "LP"
           - "Limited partner split"
@@ -245,7 +246,7 @@ model_schema:
         max: 100
 
       gp_split_pct:
-        label: "GP Split %"
+        label: "GP"
         aliases:
           - "GP"
           - "General partner split"
@@ -259,8 +260,26 @@ model_schema:
         min: 0
         max: 100
 
+      promote_pct:
+        label: "Promote"
+        aliases:
+          - "Carried Interest"
+          - "Carry"
+          - "GP Promote"
+          - "Promoted Interest"
+        dtype: "percent"
+        role: "input"
+        unit: "%"
+        format: "0.00%"
+        description: >
+          The GP's promoted interest (carry) above their base GP split percentage,
+          earned after hitting IRR/MOIC hurdles.
+        example: 15.0
+        min: 0
+        max: 100
+
       hurdle_irr_pct:
-        label: "Hurdle IRR %"
+        label: "Hurdle"
         aliases:
           - "Hurdle IRR"
           - "IRR Hurdle"
@@ -273,7 +292,7 @@ model_schema:
         max: 100
 
       moic_multiple:
-        label: "MOIC Multiple"
+        label: "Multiple"
         aliases:
           - "Multiple"
           - "MOIC Hurdle"
@@ -287,7 +306,7 @@ model_schema:
         max: 6
 
       dollar_amount:
-        label: "Dollar Amount"
+        label: "$ Amount"
         aliases:
           - "$ Amount"
         dtype: "currency"
@@ -554,6 +573,17 @@ model_schema:
         unit: "Month"
         role: "input"
         example: 14
+
+      last_units_delivered_month:
+        label: "Last Units Delivered"
+        aliases:
+          - "Final Units"
+          - "Last C.O."
+          - "Construction Complete"
+        dtype: "integer"
+        unit: "Month"
+        role: "input"
+        example: 24
 
       lease_up_commencement_month:
         label: "Lease Up Commencement"

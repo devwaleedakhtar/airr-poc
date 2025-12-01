@@ -332,6 +332,18 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
               {saving && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
               {saving ? "Saving..." : "Save Mapping"}
             </Button>
+            <Button
+              variant="outline"
+              asChild
+            >
+              <a
+                href={`https://chat.example.com?sessionId=${encodeURIComponent(sessionId)}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Ask AI
+              </a>
+            </Button>
           </div>
         </div>
 
