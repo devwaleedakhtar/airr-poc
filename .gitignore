@@ -28,3 +28,7 @@
 /backend/.env.local
 ./dev
 dev
+
+.env
+.env.local
+__pycache__/
