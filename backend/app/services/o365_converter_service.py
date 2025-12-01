@@ -38,8 +38,8 @@ def _download_original_to_temp(doc: Dict[str, object]) -> str:
     return download_to_temp(original_url, suffix=suffix)
 
 
-def convert_via_office365(doc: Dict[str, object], workbook_id: str, sheet_name: str) -> ConversionResult:
-    """Convert a single sheet to PDF via Excel Online (Microsoft Graph)."""
+def ensure_graph_item_id(doc: Dict[str, object], workbook_id: str) -> str:
+    """Ensure the workbook exists as a Graph drive item and return its id."""
     graph_item_id: Optional[str] = None
     raw_item = doc.get("graph_item_id")
     if isinstance(raw_item, str) and raw_item:
@@ -53,7 +53,7 @@ def convert_via_office365(doc: Dict[str, object], workbook_id: str, sheet_name: 
                 content = f.read()
             graph_item_id = graph_client.upload_workbook(workbook_id, str(doc.get("filename") or "workbook.xlsx"), content)
             # NOTE: we could persist graph_item_id back into Mongo here via a repo helper
-            # to avoid re-uploading the same workbook in future conversions.
+            # to avoid re-uploading the same workbook in future operations.
         finally:
             if tmp_path and os.path.exists(tmp_path):
                 try:
@@ -64,10 +64,18 @@ def convert_via_office365(doc: Dict[str, object], workbook_id: str, sheet_name: 
     if not graph_item_id:
         raise RuntimeError("Failed to obtain Graph drive item id for workbook")
 
+    return graph_item_id
+
+
+def convert_via_office365(doc: Dict[str, object], workbook_id: str, sheet_name: str) -> ConversionResult:
+    """Convert a single sheet to PDF via Excel Online (Microsoft Graph)."""
+    graph_item_id = ensure_graph_item_id(doc, workbook_id)
+
     session_id = graph_client.create_workbook_session(graph_item_id)
     graph_client.activate_sheet(graph_item_id, session_id, sheet_name)
     graph_client.hide_other_sheets(graph_item_id, session_id, sheet_name)
     graph_client.auto_fit_columns(graph_item_id, session_id, sheet_name)
+    graph_client.set_single_page_layout(graph_item_id, session_id, sheet_name)
 
     pdf_bytes = graph_client.download_pdf(graph_item_id, session_id)
 

@@ -18,7 +18,7 @@ const steps: Step[] = [
   {
     id: "converting",
     label: "Convert",
-    description: "Converting sheet to PDF",
+    description: "Preparing sheet for extraction",
   },
   {
     id: "extracting",

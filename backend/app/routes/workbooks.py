@@ -21,7 +21,7 @@ from ..schemas.workbooks import (
 )
 from ..services.converter_service import convert_excel_sheet_to_pdf
 from ..services.converter_service import _ensure_xlsx
-from ..services import o365_converter_service
+from ..services import o365_converter_service, o365_extraction_service
 
 
 router = APIRouter(prefix="/workbooks", tags=["workbooks"])
@@ -110,6 +110,22 @@ async def convert_workbook(
     if payload.sheet_name not in doc.get("sheets", []):
         raise HTTPException(status_code=400, detail="Invalid sheet name")
 
+    backend = (settings.converter_backend or "libreoffice").lower()
+
+    # For Office 365 / Graph backends we rely solely on Excel Online for
+    # extraction and do not generate PDFs at all. Here we only ensure the
+    # workbook exists as a Graph drive item and cache its id.
+    if backend in ("office365", "o365", "graph", "hybrid"):
+        try:
+            graph_item_id = o365_converter_service.ensure_graph_item_id(doc, workbook_id)
+            await workbooks_repo.set_graph_item_id(db, workbook_id, graph_item_id)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Graph preparation failed: {e}")
+
+        # No PDF is produced in this path; callers relying on O365 extraction
+        # no longer need it. We keep the response model but return an empty URL.
+        return ConvertResponse(pdf_url="")
+
     tmp_xlsx: Optional[str] = None
     pdf_path: Optional[str] = None
     try:
@@ -127,25 +143,11 @@ async def convert_workbook(
         else:
             tmp_xlsx = download_to_temp(doc["original_url"], suffix=os.path.splitext(doc.get("filename", ""))[1])
 
-        # Convert single sheet to PDF using configured backend
+        # Convert single sheet to PDF using LibreOffice-based backend
         try:
-            backend = (settings.converter_backend or "libreoffice").lower()
             result = None
 
-            if backend in ("office365", "o365", "graph", "hybrid"):
-                try:
-                    result = o365_converter_service.convert_via_office365(
-                        doc,
-                        workbook_id,
-                        payload.sheet_name,
-                    )
-                except Exception:
-                    if backend == "hybrid" and tmp_xlsx:
-                        result = convert_excel_sheet_to_pdf(tmp_xlsx, payload.sheet_name)
-                    else:
-                        raise
-            else:
-                result = convert_excel_sheet_to_pdf(tmp_xlsx, payload.sheet_name)
+            result = convert_excel_sheet_to_pdf(tmp_xlsx, payload.sheet_name)
 
             pdf_path = result.pdf_path
 
@@ -200,7 +202,7 @@ async def extract_workbook(
     if not doc:
         raise HTTPException(status_code=404, detail="Workbook not found")
 
-    # Determine PDF URL
+    # Determine PDF URL (still stored for sessions, but not always used for extraction)
     sheet_name = payload.sheet_name
     pdfs = doc.get("pdfs", {})
     pdf_public_ids = doc.get("pdf_public_ids", {})
@@ -209,60 +211,73 @@ async def extract_workbook(
     if sheet_name and sheet_name in pdfs:
         pdf_url = pdfs[sheet_name]
     elif not sheet_name and isinstance(pdfs, dict) and pdfs:
-        # pick any existing converted sheet
         sheet_name = list(pdfs.keys())[0]
         pdf_url = pdfs[sheet_name]
-    
-    if not pdf_url:
-        raise HTTPException(status_code=400, detail="No PDF found for extraction. Convert a sheet first or provide sheet_name.")
 
-    tmp_pdf: Optional[str] = None
-    try:
-        # Download PDF
-        if pdf_public_ids.get(sheet_name):
-            signed = private_download_url(
-                pdf_public_ids[sheet_name],
-                pdf_formats.get(sheet_name) or "pdf",
-                resource_type="raw",
-                type="private",
-            )
-            tmp_pdf = download_to_temp(signed, suffix=".pdf")
-        else:
-            tmp_pdf = download_to_temp(pdf_url, suffix=".pdf")
+    if not sheet_name:
+        raise HTTPException(status_code=400, detail="sheet_name is required for extraction when no converted sheets are available.")
 
-        # Extract
+    backend = (settings.converter_backend or "libreoffice").lower()
+    use_o365 = backend in ("office365", "o365", "graph", "hybrid")
+    result = None
+
+    if use_o365:
         try:
-            result = extract_from_pdf(tmp_pdf)
+            result = o365_extraction_service.extract_via_office365(
+                doc,
+                workbook_id,
+                sheet_name,
+            )
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Extraction failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Extraction failed via Office 365: {e}")
+    else:
+        if not pdf_url:
+            raise HTTPException(status_code=400, detail="No PDF found for extraction. Convert a sheet first or provide sheet_name.")
 
-        # Persist session
-        from ..repositories import sessions_repo
+        tmp_pdf: Optional[str] = None
+        try:
+            if pdf_public_ids.get(sheet_name):
+                signed = private_download_url(
+                    pdf_public_ids[sheet_name],
+                    pdf_formats.get(sheet_name) or "pdf",
+                    resource_type="raw",
+                    type="private",
+                )
+                tmp_pdf = download_to_temp(signed, suffix=".pdf")
+            else:
+                tmp_pdf = download_to_temp(pdf_url, suffix=".pdf")
 
-        session_id = await sessions_repo.create(
-            db,
-            {
-                "workbook_id": workbook_id,
-                "sheet_name": sheet_name,
-                "pdf_url": pdf_url,
-                "extracted_json": result.extracted_json,
-                "confidences": result.confidences,
-                "inferred_tables": result.inferred_tables,
-                "warnings": result.warnings,
-                "text_snippets": result.text_snippets,
-            },
-        )
-
-        return ExtractResponse(
-            session_id=session_id,
-            extracted_json=result.extracted_json,
-            confidences=result.confidences,
-            inferred_tables=result.inferred_tables,
-            warnings=result.warnings,
-        )
-    finally:
-        if tmp_pdf and os.path.exists(tmp_pdf):
             try:
-                os.remove(tmp_pdf)
-            except FileNotFoundError:
-                pass
+                result = extract_from_pdf(tmp_pdf)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Extraction failed: {e}")
+        finally:
+            if tmp_pdf and os.path.exists(tmp_pdf):
+                try:
+                    os.remove(tmp_pdf)
+                except FileNotFoundError:
+                    pass
+
+    from ..repositories import sessions_repo
+
+    session_id = await sessions_repo.create(
+        db,
+        {
+            "workbook_id": workbook_id,
+            "sheet_name": sheet_name,
+            "pdf_url": pdf_url or "",
+            "extracted_json": result.extracted_json,
+            "confidences": result.confidences,
+            "inferred_tables": result.inferred_tables,
+            "warnings": result.warnings,
+            "text_snippets": result.text_snippets,
+        },
+    )
+
+    return ExtractResponse(
+        session_id=session_id,
+        extracted_json=result.extracted_json,
+        confidences=result.confidences,
+        inferred_tables=result.inferred_tables,
+        warnings=result.warnings,
+    )
