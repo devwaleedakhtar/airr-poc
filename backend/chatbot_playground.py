@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-import json
 import sys
+import json
+import asyncio
 from pathlib import Path
 from typing import Any, Dict, List
 
 import streamlit as st
 
+from app.routes.sessions import get_session
 from app.schemas.chat import ChatAnswer, ChatQuestionRequest  
 from app.services import chatbot_service 
 
@@ -33,11 +35,13 @@ if not session_id:
     st.stop()
 
 # Optional: cache to avoid re-fetching every rerun
-@st.cache_data(show_spinner=True)
+# @st.cache_data(show_spinner=True)
 def load_session_payload(session_id: str):
     if session_id == 'sample':
         data = json.load(open('backend/app/constants/mapped_sample.json', 'r'))
-    # TODO: Implement this
+    else:
+        data = asyncio.run(get_session(session_id))
+        print('Session-data:', data)
     return data
 
 st.session_state["session_payload"] = load_session_payload(session_id)
