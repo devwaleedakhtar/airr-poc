@@ -1,0 +1,782 @@
+{
+  "mapping": {
+    "mapped": {
+      "unit_mix": [
+        {
+          "unit_type": "1BR/1BA",
+          "num_units": { "$numberInt": "50" },
+          "avg_sf": { "$numberInt": "600" },
+          "rent": { "$numberInt": "1425" },
+          "rent_psf": { "$numberDouble": "2.38" },
+          "original_label": "1BR/1BA"
+        },
+        {
+          "unit_type": "2BR/1BA",
+          "num_units": { "$numberInt": "20" },
+          "avg_sf": { "$numberInt": "725" },
+          "rent": { "$numberInt": "1600" },
+          "rent_psf": { "$numberDouble": "2.21" },
+          "original_label": "2BR/1BA"
+        },
+        {
+          "unit_type": "2BR/2BA",
+          "num_units": { "$numberInt": "65" },
+          "avg_sf": { "$numberInt": "875" },
+          "rent": { "$numberInt": "1875" },
+          "rent_psf": { "$numberDouble": "2.14" },
+          "original_label": "2BR/2BA"
+        },
+        {
+          "unit_type": "3BR/2BA",
+          "num_units": { "$numberInt": "10" },
+          "avg_sf": { "$numberInt": "1025" },
+          "rent": { "$numberInt": "2100" },
+          "rent_psf": { "$numberDouble": "2.05" },
+          "original_label": "3BR/2BA"
+        }
+      ],
+      "growth_assumptions": {
+        "market_rent_growth": null,
+        "affordable_rent_growth": null,
+        "other_income_growth": "3.00%",
+        "controllables_growth": "2.00%",
+        "taxes_growth": null,
+        "insurance_growth": null
+      },
+      "waterfall": [
+        {
+          "tier_name": "Preferred Return",
+          "lp_split_pct": "95.00%",
+          "gp_split_pct": "5.00%",
+          "hurdle_irr_pct": "8.00%",
+          "moic_multiple": null,
+          "dollar_amount": null,
+          "original_label": "Preferred Return"
+        },
+        {
+          "tier_name": "Hurdle #2",
+          "lp_split_pct": "80.00%",
+          "gp_split_pct": "20.00%",
+          "hurdle_irr_pct": "10.00%",
+          "moic_multiple": null,
+          "dollar_amount": null,
+          "original_label": "Hurdle #2"
+        },
+        {
+          "tier_name": "Hurdle #3",
+          "lp_split_pct": "70.00%",
+          "gp_split_pct": "30.00%",
+          "hurdle_irr_pct": "15.00%",
+          "moic_multiple": null,
+          "dollar_amount": null,
+          "original_label": "Hurdle #3"
+        },
+        {
+          "tier_name": "Hurdle #4",
+          "lp_split_pct": "50.00%",
+          "gp_split_pct": "50.00%",
+          "hurdle_irr_pct": null,
+          "moic_multiple": null,
+          "dollar_amount": null,
+          "original_label": "Hurdle #4"
+        }
+      ],
+      "other_income": [
+        {
+          "item_name": "misc",
+          "num_units": { "$numberInt": "145" },
+          "amount_per_month": { "$numberInt": "10" },
+          "total_monthly_income": { "$numberInt": "1450" }
+        },
+        {
+          "item_name": "application_fees_admin_other",
+          "num_units": { "$numberInt": "145" },
+          "amount_per_month": { "$numberInt": "3" },
+          "total_monthly_income": { "$numberInt": "435" }
+        },
+        {
+          "item_name": "pet_rent_monthly",
+          "num_units": { "$numberInt": "145" },
+          "amount_per_month": { "$numberInt": "15" },
+          "total_monthly_income": { "$numberInt": "2175" }
+        },
+        {
+          "item_name": "pet_rent_one_time_fee",
+          "num_units": { "$numberInt": "145" },
+          "amount_per_month": { "$numberInt": "5" },
+          "total_monthly_income": { "$numberInt": "725" }
+        },
+        {
+          "item_name": "garage_first_car",
+          "num_units": { "$numberInt": "145" },
+          "amount_per_month": { "$numberInt": "50" },
+          "total_monthly_income": { "$numberInt": "7250" }
+        },
+        {
+          "item_name": "storage",
+          "num_units": { "$numberInt": "0" },
+          "amount_per_month": { "$numberInt": "0" },
+          "total_monthly_income": { "$numberInt": "0" }
+        }
+      ],
+      "property_information": {
+        "deal_name": null,
+        "address": "555 Main Street, Santa Barbara, CA",
+        "city": "Santa Barbara",
+        "state": "CA",
+        "land_size_acres": null
+      },
+      "project_timeline": {
+        "land_closing_date": "2024-02-24",
+        "construction_start_month": null,
+        "construction_completion_month": null,
+        "first_units_delivered_month": null,
+        "lease_up_commencement_month": { "$numberInt": "14" }
+      },
+      "revenue_and_leaseup": {
+        "vacancy_pct": null,
+        "loss_to_lease_pct": null,
+        "bad_debt_pct": "1.00%",
+        "model_units": null,
+        "concessions_lease_up_months": null,
+        "leased_units_per_month": null,
+        "renewal_probability_pct": null,
+        "lease_term_months": null,
+        "advanced_free_rent_features_note": null
+      },
+      "operating_expenses": {
+        "payroll": { "$numberInt": "217500" },
+        "utilities": { "$numberInt": "72500" },
+        "turnover": { "$numberInt": "43500" },
+        "contract_services": { "$numberInt": "21750" },
+        "repairs_maintenance": { "$numberInt": "72500" },
+        "leasing_marketing": { "$numberInt": "36250" },
+        "general_admin": { "$numberInt": "43500" },
+        "other_expenses": null,
+        "management_fee_pct": "3.00%",
+        "insurance": { "$numberInt": "58000" },
+        "property_taxes": { "$numberInt": "50000" },
+        "other_taxes_fees": { "$numberInt": "5000" },
+        "replacement_reserves": { "$numberInt": "43500" }
+      },
+      "senior_loan_terms": {
+        "loan_to_cost_pct": "60%",
+        "interest_type": "Floating-Rate",
+        "curve": null,
+        "sofr_spread_pct": "3.00%",
+        "sofr_floor_pct": null,
+        "sofr_cap_pct": null,
+        "interest_only_period_months": null,
+        "amortization_schedule_years": null,
+        "initial_term_months": { "$numberInt": "24" },
+        "loan_maturity_months": { "$numberInt": "24" },
+        "origination_fee_pct": "1.00%",
+        "rate_stepdown_dscr_multiple": null,
+        "rate_stepdown_dy_pct": null,
+        "stepdown_rate_pct": null,
+        "exit_fee_pct": null
+      },
+      "preferred_equity_terms": {
+        "has_preferred_equity": false,
+        "loan_to_cost_pct": null,
+        "initial_term_months": null,
+        "interest_type": null,
+        "sofr_spread_pct": null,
+        "sofr_floor_pct": null,
+        "total_interest_rate_pct": null,
+        "minimum_multiple": null,
+        "current_pay_pct": null,
+        "accrual_pct": null
+      },
+      "exit_assumptions": {
+        "sale_date": null,
+        "sale_month": { "$numberInt": "96" },
+        "noi_type": null,
+        "sale_costs_pct": "1.00%",
+        "exit_cap_rate_mf_pct": "6.00%",
+        "exit_cap_rate_retail_pct": null
+      },
+      "tax_reassessment_at_exit": {
+        "reassess_at_sale": true,
+        "property_tax_millage_rate_pct": "1.20%",
+        "county_assessment_pct": "100%",
+        "market_value_as_pct_of_sale_price": null,
+        "tax_adjusted_exit_cap_rate_mf": null
+      },
+      "sources_and_uses": {
+        "senior_loan_amount": { "$numberInt": "20872774" },
+        "preferred_equity_amount": null,
+        "lp_equity_amount": null,
+        "gp_equity_amount": null,
+        "land_acquisition_cost": { "$numberInt": "10000000" },
+        "hard_costs_total": { "$numberInt": "19350000" },
+        "soft_costs_total": { "$numberInt": "1786679" },
+        "financing_costs": { "$numberInt": "208728" },
+        "operating_reserve": { "$numberInt": "71549" },
+        "senior_interest_reserve": { "$numberInt": "1157333" },
+        "total_uses": { "$numberInt": "34787957" }
+      }
+    },
+    "missing_fields": [
+      {
+        "table": "growth_assumptions",
+        "field": "market_rent_growth",
+        "reason": "Only multi-year schedule provided; single overall growth rate not specified.",
+        "confidence": "high",
+        "source_fields": [
+          "Revenue Adjustments Assumptions.annual_market_rent_growth"
+        ],
+        "table_label": "Operations Assumptions / Trending / Growth Assumptions",
+        "field_label": "Market Rent Growth"
+      },
+      {
+        "table": "growth_assumptions",
+        "field": "affordable_rent_growth",
+        "reason": "No affordable rent growth provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Operations Assumptions / Trending / Growth Assumptions",
+        "field_label": "Affordable Rent Growth"
+      },
+      {
+        "table": "growth_assumptions",
+        "field": "taxes_growth",
+        "reason": "No explicit annual taxes growth rate provided.",
+        "confidence": "high",
+        "source_fields": ["Property Taxes Schedule"],
+        "table_label": "Operations Assumptions / Trending / Growth Assumptions",
+        "field_label": "Taxes Growth"
+      },
+      {
+        "table": "growth_assumptions",
+        "field": "insurance_growth",
+        "reason": "No insurance growth rate provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Operations Assumptions / Trending / Growth Assumptions",
+        "field_label": "Insurance Growth"
+      },
+      {
+        "table": "property_information",
+        "field": "deal_name",
+        "reason": "Deal name not provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Property Information",
+        "field_label": "Deal Name"
+      },
+      {
+        "table": "property_information",
+        "field": "land_size_acres",
+        "reason": "Source provides fractional acres (9.5) but canonical field expects integer.",
+        "confidence": "medium",
+        "source_fields": ["Property Details.net_acres"],
+        "table_label": "Property Information",
+        "field_label": "Land Size"
+      },
+      {
+        "table": "project_timeline",
+        "field": "construction_start_month",
+        "reason": "Not provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Project Timeline",
+        "field_label": "Construction Start"
+      },
+      {
+        "table": "project_timeline",
+        "field": "construction_completion_month",
+        "reason": "Not provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Project Timeline",
+        "field_label": "Construction Completion"
+      },
+      {
+        "table": "project_timeline",
+        "field": "first_units_delivered_month",
+        "reason": "Not provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Project Timeline",
+        "field_label": "First Units Delivered"
+      },
+      {
+        "table": "revenue_and_leaseup",
+        "field": "vacancy_pct",
+        "reason": "Only multi-year vacancy schedule provided; single vacancy assumption not specified.",
+        "confidence": "high",
+        "source_fields": ["Revenue Adjustments Assumptions.physical_vacancy"],
+        "table_label": "Revenue and Lease Up Assumptions",
+        "field_label": "Vacancy"
+      },
+      {
+        "table": "revenue_and_leaseup",
+        "field": "loss_to_lease_pct",
+        "reason": "Not provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Revenue and Lease Up Assumptions",
+        "field_label": "Loss to Lease"
+      },
+      {
+        "table": "revenue_and_leaseup",
+        "field": "model_units",
+        "reason": "Not provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Revenue and Lease Up Assumptions",
+        "field_label": "Model Units"
+      },
+      {
+        "table": "revenue_and_leaseup",
+        "field": "concessions_lease_up_months",
+        "reason": "Only percentage concessions provided; months free not specified.",
+        "confidence": "high",
+        "source_fields": ["Revenue Adjustments Assumptions.concessions"],
+        "table_label": "Revenue and Lease Up Assumptions",
+        "field_label": "Concessions - Lease Up (New)"
+      },
+      {
+        "table": "revenue_and_leaseup",
+        "field": "leased_units_per_month",
+        "reason": "Not provided.",
+        "confidence": "high",
+        "source_fields": ["Lease-Up Information"],
+        "table_label": "Revenue and Lease Up Assumptions",
+        "field_label": "Leased Units Per Month"
+      },
+      {
+        "table": "revenue_and_leaseup",
+        "field": "renewal_probability_pct",
+        "reason": "Not provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Revenue and Lease Up Assumptions",
+        "field_label": "Renewal Probability"
+      },
+      {
+        "table": "revenue_and_leaseup",
+        "field": "lease_term_months",
+        "reason": "Not provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Revenue and Lease Up Assumptions",
+        "field_label": "Lease Term"
+      },
+      {
+        "table": "operating_expenses",
+        "field": "other_expenses",
+        "reason": "No distinct other expense line provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Operating Expenses",
+        "field_label": "Other Expenses"
+      },
+      {
+        "table": "senior_loan_terms",
+        "field": "curve",
+        "reason": "Not provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Senior Loan Terms",
+        "field_label": "Curve"
+      },
+      {
+        "table": "senior_loan_terms",
+        "field": "sofr_floor_pct",
+        "reason": "Not provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Senior Loan Terms",
+        "field_label": "SOFR Floor"
+      },
+      {
+        "table": "senior_loan_terms",
+        "field": "sofr_cap_pct",
+        "reason": "Not provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Senior Loan Terms",
+        "field_label": "SOFR Cap"
+      },
+      {
+        "table": "senior_loan_terms",
+        "field": "interest_only_period_months",
+        "reason": "Not provided for construction loan.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Senior Loan Terms",
+        "field_label": "Interest Only Period"
+      },
+      {
+        "table": "senior_loan_terms",
+        "field": "amortization_schedule_years",
+        "reason": "Not applicable/provided for construction loan.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Senior Loan Terms",
+        "field_label": "Amortization Schedule"
+      },
+      {
+        "table": "senior_loan_terms",
+        "field": "rate_stepdown_dscr_multiple",
+        "reason": "Not provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Senior Loan Terms",
+        "field_label": "Rate Stepdown DSCR"
+      },
+      {
+        "table": "senior_loan_terms",
+        "field": "rate_stepdown_dy_pct",
+        "reason": "Not provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Senior Loan Terms",
+        "field_label": "Rate Stepdown DY"
+      },
+      {
+        "table": "senior_loan_terms",
+        "field": "stepdown_rate_pct",
+        "reason": "Not provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Senior Loan Terms",
+        "field_label": "Stepdown Rate"
+      },
+      {
+        "table": "senior_loan_terms",
+        "field": "exit_fee_pct",
+        "reason": "Not provided for construction loan.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Senior Loan Terms",
+        "field_label": "Exit Fee"
+      },
+      {
+        "table": "preferred_equity_terms",
+        "field": "loan_to_cost_pct",
+        "reason": "No preferred equity in sources; terms not applicable/provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Preferred Equity Terms",
+        "field_label": "Loan to Cost %"
+      },
+      {
+        "table": "preferred_equity_terms",
+        "field": "initial_term_months",
+        "reason": "No preferred equity in sources; terms not applicable/provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Preferred Equity Terms",
+        "field_label": "Initial Term"
+      },
+      {
+        "table": "preferred_equity_terms",
+        "field": "interest_type",
+        "reason": "No preferred equity in sources; terms not applicable/provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Preferred Equity Terms",
+        "field_label": "Interest Type - Fixed/Floating"
+      },
+      {
+        "table": "preferred_equity_terms",
+        "field": "sofr_spread_pct",
+        "reason": "No preferred equity in sources; terms not applicable/provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Preferred Equity Terms",
+        "field_label": "SOFR Spread"
+      },
+      {
+        "table": "preferred_equity_terms",
+        "field": "sofr_floor_pct",
+        "reason": "No preferred equity in sources; terms not applicable/provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Preferred Equity Terms",
+        "field_label": "SOFR Floor"
+      },
+      {
+        "table": "preferred_equity_terms",
+        "field": "total_interest_rate_pct",
+        "reason": "No preferred equity in sources; terms not applicable/provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Preferred Equity Terms",
+        "field_label": "Total Interest Rate"
+      },
+      {
+        "table": "preferred_equity_terms",
+        "field": "minimum_multiple",
+        "reason": "No preferred equity in sources; terms not applicable/provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Preferred Equity Terms",
+        "field_label": "Minimum Multiple"
+      },
+      {
+        "table": "preferred_equity_terms",
+        "field": "current_pay_pct",
+        "reason": "No preferred equity in sources; terms not applicable/provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Preferred Equity Terms",
+        "field_label": "Current Pay %"
+      },
+      {
+        "table": "preferred_equity_terms",
+        "field": "accrual_pct",
+        "reason": "No preferred equity in sources; terms not applicable/provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Preferred Equity Terms",
+        "field_label": "Accrual %"
+      },
+      {
+        "table": "exit_assumptions",
+        "field": "sale_date",
+        "reason": "Model-calculated; source does not specify explicit sale date.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Exit Assumptions",
+        "field_label": "Sale Date"
+      },
+      {
+        "table": "exit_assumptions",
+        "field": "noi_type",
+        "reason": "Not provided for sale assumptions.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Exit Assumptions",
+        "field_label": "NOI Type"
+      },
+      {
+        "table": "exit_assumptions",
+        "field": "exit_cap_rate_retail_pct",
+        "reason": "No retail component provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Exit Assumptions",
+        "field_label": "Exit Capitalization (Retail)"
+      },
+      {
+        "table": "tax_reassessment_at_exit",
+        "field": "market_value_as_pct_of_sale_price",
+        "reason": "Not provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Tax Reassessment at Exit",
+        "field_label": "Market Value as % of Sale Price"
+      },
+      {
+        "table": "tax_reassessment_at_exit",
+        "field": "tax_adjusted_exit_cap_rate_mf",
+        "reason": "Model-calculated; not to be populated.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Tax Reassessment at Exit",
+        "field_label": "Tax Adjusted Exit Cap Rate (MF)"
+      },
+      {
+        "table": "sources_and_uses",
+        "field": "preferred_equity_amount",
+        "reason": "No preferred equity source provided.",
+        "confidence": "high",
+        "source_fields": null,
+        "table_label": "Sources and Uses",
+        "field_label": "Preferred Equity"
+      },
+      {
+        "table": "sources_and_uses",
+        "field": "lp_equity_amount",
+        "reason": "Total equity provided but not split between LP and GP.",
+        "confidence": "high",
+        "source_fields": [
+          "Sources of Funds (Construction Financing).equity",
+          "Equity Structure.lp_equity_percent"
+        ],
+        "table_label": "Sources and Uses",
+        "field_label": "LP Equity"
+      },
+      {
+        "table": "sources_and_uses",
+        "field": "gp_equity_amount",
+        "reason": "Total equity provided but not split between LP and GP.",
+        "confidence": "high",
+        "source_fields": [
+          "Sources of Funds (Construction Financing).equity",
+          "Equity Structure.gp_equity_percent"
+        ],
+        "table_label": "Sources and Uses",
+        "field_label": "GP Equity"
+      },
+      {
+        "table": "revenue_and_leaseup",
+        "field": "advanced_free_rent_features_note",
+        "reason": "Value missing after mapping",
+        "confidence": null,
+        "source_fields": null,
+        "table_label": "Revenue and Lease Up Assumptions",
+        "field_label": "Advanced Lease-Up Free Rent Features"
+      }
+    ],
+    "metadata": {
+      "generated_at": { "$date": { "$numberLong": "1764082125004" } },
+      "warnings": [
+        "Land size provided as 9.5 acres; canonical field expects integer so value left null.",
+        "Replacement reserves total calculated from per-unit value (300 x 145 = 43500).",
+        "Waterfall GP/LP splits mapped from 'Waterfall Cash Flow Split'; 'gp_promote' values not used for splits.",
+        "Refinance/permanent financing terms detected but not mapped to senior construction loan terms."
+      ],
+      "model_version": "canonical_schema_v1.0",
+      "table_labels": {
+        "unit_mix": "unit_mix",
+        "growth_assumptions": "Operations Assumptions / Trending / Growth Assumptions",
+        "waterfall": "Waterfall",
+        "other_income": "Other Income",
+        "property_information": "Property Information",
+        "project_timeline": "Project Timeline",
+        "revenue_and_leaseup": "Revenue and Lease Up Assumptions",
+        "operating_expenses": "Operating Expenses",
+        "senior_loan_terms": "Senior Loan Terms",
+        "preferred_equity_terms": "Preferred Equity Terms",
+        "exit_assumptions": "Exit Assumptions",
+        "tax_reassessment_at_exit": "Tax Reassessment at Exit",
+        "sources_and_uses": "Sources and Uses"
+      },
+      "field_labels": {
+        "unit_mix": {
+          "unit_type": "Unit Type",
+          "num_units": "# of Units",
+          "avg_sf": "Avg. SF",
+          "rent": "Rent",
+          "rent_psf": "Rent PSF",
+          "original_label": "Original Unit Label"
+        },
+        "growth_assumptions": {
+          "market_rent_growth": "Market Rent Growth",
+          "affordable_rent_growth": "Affordable Rent Growth",
+          "other_income_growth": "Other Income Growth",
+          "controllables_growth": "Controllables Growth",
+          "taxes_growth": "Taxes Growth",
+          "insurance_growth": "Insurance Growth"
+        },
+        "waterfall": {
+          "tier_name": "Tier",
+          "lp_split_pct": "LP Split %",
+          "gp_split_pct": "GP Split %",
+          "hurdle_irr_pct": "Hurdle IRR %",
+          "moic_multiple": "MOIC Multiple",
+          "dollar_amount": "Dollar Amount",
+          "original_label": "Original Tier Label"
+        },
+        "other_income": {
+          "item_name": "Other Income Item",
+          "num_units": "# of Units",
+          "amount_per_month": "$ Per Month",
+          "total_monthly_income": "Total Monthly Income"
+        },
+        "property_information": {
+          "deal_name": "Deal Name",
+          "address": "Address",
+          "city": "City",
+          "state": "State",
+          "land_size_acres": "Land Size"
+        },
+        "project_timeline": {
+          "land_closing_date": "Land Closing Date",
+          "construction_start_month": "Construction Start",
+          "construction_completion_month": "Construction Completion",
+          "first_units_delivered_month": "First Units Delivered",
+          "lease_up_commencement_month": "Lease Up Commencement"
+        },
+        "revenue_and_leaseup": {
+          "vacancy_pct": "Vacancy",
+          "loss_to_lease_pct": "Loss to Lease",
+          "bad_debt_pct": "Bad Debt",
+          "model_units": "Model Units",
+          "concessions_lease_up_months": "Concessions - Lease Up (New)",
+          "leased_units_per_month": "Leased Units Per Month",
+          "renewal_probability_pct": "Renewal Probability",
+          "lease_term_months": "Lease Term",
+          "advanced_free_rent_features_note": "Advanced Lease-Up Free Rent Features"
+        },
+        "operating_expenses": {
+          "payroll": "Payroll",
+          "utilities": "Utilities",
+          "turnover": "Turnover",
+          "contract_services": "Contract Services",
+          "repairs_maintenance": "Repairs and Maintenance",
+          "leasing_marketing": "Leasing and Marketing",
+          "general_admin": "General and Administrative",
+          "other_expenses": "Other Expenses",
+          "management_fee_pct": "Management Fee",
+          "insurance": "Insurance",
+          "property_taxes": "Property Taxes",
+          "other_taxes_fees": "Other Taxes / Fees",
+          "replacement_reserves": "Replacement Reserves"
+        },
+        "senior_loan_terms": {
+          "loan_to_cost_pct": "Loan to Cost %",
+          "interest_type": "Interest Type - Fixed/Floating",
+          "curve": "Curve",
+          "sofr_spread_pct": "SOFR Spread",
+          "sofr_floor_pct": "SOFR Floor",
+          "sofr_cap_pct": "SOFR Cap",
+          "interest_only_period_months": "Interest Only Period",
+          "amortization_schedule_years": "Amortization Schedule",
+          "initial_term_months": "Initial Term",
+          "loan_maturity_months": "Loan Maturity",
+          "origination_fee_pct": "Origination Fee",
+          "rate_stepdown_dscr_multiple": "Rate Stepdown DSCR",
+          "rate_stepdown_dy_pct": "Rate Stepdown DY",
+          "stepdown_rate_pct": "Stepdown Rate",
+          "exit_fee_pct": "Exit Fee"
+        },
+        "preferred_equity_terms": {
+          "has_preferred_equity": "Preferred Equity?",
+          "loan_to_cost_pct": "Loan to Cost %",
+          "initial_term_months": "Initial Term",
+          "interest_type": "Interest Type - Fixed/Floating",
+          "sofr_spread_pct": "SOFR Spread",
+          "sofr_floor_pct": "SOFR Floor",
+          "total_interest_rate_pct": "Total Interest Rate",
+          "minimum_multiple": "Minimum Multiple",
+          "current_pay_pct": "Current Pay %",
+          "accrual_pct": "Accrual %"
+        },
+        "exit_assumptions": {
+          "sale_date": "Sale Date",
+          "sale_month": "Sale Month",
+          "noi_type": "NOI Type",
+          "sale_costs_pct": "Sale Costs %",
+          "exit_cap_rate_mf_pct": "Exit Capitalization Rate (MF)",
+          "exit_cap_rate_retail_pct": "Exit Capitalization (Retail)"
+        },
+        "tax_reassessment_at_exit": {
+          "reassess_at_sale": "Reassess at Sale",
+          "property_tax_millage_rate_pct": "Property Tax Millage Rate",
+          "county_assessment_pct": "County Assessment %",
+          "market_value_as_pct_of_sale_price": "Market Value as % of Sale Price",
+          "tax_adjusted_exit_cap_rate_mf": "Tax Adjusted Exit Cap Rate (MF)"
+        },
+        "sources_and_uses": {
+          "senior_loan_amount": "Senior Loan",
+          "preferred_equity_amount": "Preferred Equity",
+          "lp_equity_amount": "LP Equity",
+          "gp_equity_amount": "GP Equity",
+          "land_acquisition_cost": "Land",
+          "hard_costs_total": "Hard Costs",
+          "soft_costs_total": "Soft Costs",
+          "financing_costs": "Financing Costs",
+          "operating_reserve": "Operating Reserve",
+          "senior_interest_reserve": "Senior Interest Reserve",
+          "total_uses": "Total Uses"
+        }
+      }
+    }
+  }
+}
