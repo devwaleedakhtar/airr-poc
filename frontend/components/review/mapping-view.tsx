@@ -2,18 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import {
-  exportWorkbook,
-  getMappingStatus,
-  saveMapping,
-  startMappingJob,
-} from "@/lib/api";
-import type {
-  ExportResult,
-  MappingResult,
-  MappingJobStatus,
-  MissingField,
-} from "@/types/mapping";
+import { exportWorkbook, getMappingStatus, saveMapping, startMappingJob } from "@/lib/api";
+import type { MappingResult, MappingJobStatus, MissingField } from "@/types/mapping";
 import type { JsonValue } from "@/types/json";
 import { Button } from "@/components/ui/button";
 import { H1, H3, P } from "@/components/ui/typography";
@@ -28,7 +18,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, Loader2 } from "lucide-react";
 import FieldEditor from "./field-editor";
-import ExportDialog from "./export-dialog";
 
 const CHATBOT_URL =
   process.env.NEXT_PUBLIC_CHATBOT_URL || "http://localhost:8501";
@@ -73,8 +62,6 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [exportResult, setExportResult] = useState<ExportResult | null>(null);
-  const [showExportDialog, setShowExportDialog] = useState(false);
   const [jobStatus, setJobStatus] = useState<MappingJobStatus | null>(null);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollAttempts = useRef(0);
@@ -82,6 +69,7 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
   const fieldLabels = mapping?.metadata?.field_labels ?? {};
   const isMappingRunning =
     loading || jobStatus?.status === "running" || jobStatus?.status === "pending";
+  const canAskAi = !!mapping && !isMappingRunning;
 
   const stopPolling = useCallback(() => {
     if (pollTimer.current) {
@@ -309,8 +297,12 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
                 setError(null);
                 try {
                   const result = await exportWorkbook(sessionId);
-                  setExportResult(result);
-                  setShowExportDialog(true);
+                  const url =
+                    result.download_url.startsWith("http") ||
+                    result.download_url.startsWith("https")
+                      ? result.download_url
+                      : `${window.location.origin.replace(/\/$/, "")}${result.download_url}`;
+                  window.open(url, "_blank", "noopener,noreferrer");
                   toast.success("Excel generated");
                 } catch (err) {
                   const msg =
@@ -337,15 +329,16 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
             </Button>
             <Button
               variant="outline"
-              asChild
+              disabled={!canAskAi}
+              onClick={() => {
+                if (!canAskAi) return;
+                const url = `${CHATBOT_URL}?session_id=${encodeURIComponent(
+                  sessionId
+                )}`;
+                window.open(url, "_blank", "noopener,noreferrer");
+              }}
             >
-              <a
-                href={`${CHATBOT_URL}?session_id=${encodeURIComponent(sessionId)}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Ask AI
-              </a>
+              Ask AI
             </Button>
           </div>
         </div>
@@ -691,14 +684,6 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
           </div>
         </div>
       </div>
-      {exportResult && (
-        <ExportDialog
-          open={showExportDialog}
-          onOpenChange={setShowExportDialog}
-          exportResult={exportResult}
-          sessionId={sessionId}
-        />
-      )}
     </>
   );
 }

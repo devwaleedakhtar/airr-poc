@@ -305,3 +305,40 @@ async def export_session_workbook(session_id: str, db=Depends(db_dependency)):
         raise HTTPException(status_code=500, detail=f"Failed to export workbook: {exc}")
 
     return export_result
+
+
+@router.get("/{session_id}/export/download")
+async def download_exported_workbook(session_id: str, db=Depends(db_dependency)):
+    """Stream an exported workbook directly, without relying on Cloudinary.
+
+    This mirrors the mapping logic used in export_session_workbook but always
+    generates the workbook locally and returns it as a file response.
+    """
+    doc = await sessions_repo.get(db, session_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    mapping_payload = doc.get("mapping")
+    if mapping_payload:
+        try:
+            mapping_obj = mapping_service.normalize_mapping(
+                MappingResult.model_validate(mapping_payload)
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid mapping payload: {exc}")
+    else:
+        source = doc.get("final_json") or doc.get("extracted_json")
+        if not source:
+            raise HTTPException(status_code=400, detail="Session has no data to export")
+        try:
+            mapping_obj = mapping_service.map_to_canonical(source)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+    workbook_path, _ = workbook_export_service.generate_workbook_file(session_id, mapping_obj)
+
+    return FileResponse(
+        path=str(workbook_path),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=f"{session_id}-model.xlsx",
+    )
