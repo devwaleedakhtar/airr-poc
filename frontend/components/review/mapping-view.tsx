@@ -30,6 +30,9 @@ import { AlertCircle, Loader2 } from "lucide-react";
 import FieldEditor from "./field-editor";
 import ExportDialog from "./export-dialog";
 
+const CHATBOT_URL =
+  process.env.NEXT_PUBLIC_CHATBOT_URL || "http://localhost:8501";
+
 type Props = {
   sessionId: string;
   initialMapping: MappingResult | null;
@@ -337,7 +340,7 @@ export default function MappingView({ sessionId, initialMapping }: Props) {
               asChild
             >
               <a
-                href={`https://chat.example.com?sessionId=${encodeURIComponent(sessionId)}`}
+                href={`${CHATBOT_URL}?session_id=${encodeURIComponent(sessionId)}`}
                 target="_blank"
                 rel="noreferrer"
               >

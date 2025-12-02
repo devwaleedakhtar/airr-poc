@@ -1,29 +1,25 @@
 from __future__ import annotations
 
-import sys
 import json
-import asyncio
-from pathlib import Path
+import os
 from typing import Any, Dict, List
 
+import requests
 import streamlit as st
 
-from app.routes.sessions import get_session
-from app.schemas.chat import ChatAnswer, ChatQuestionRequest  
-from app.services import chatbot_service 
+from app.schemas.chat import ChatAnswer, ChatQuestionRequest
+from app.services import chatbot_service
 
 st.set_page_config(page_title="Perpetuity AI (Alpha)", layout="wide")
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-BACKEND_PATH = REPO_ROOT / "backend"
 MAX_TABLES_TO_RETREIVE = 3
-if str(BACKEND_PATH) not in sys.path:
-    sys.path.insert(0, str(BACKEND_PATH))
+BACKEND_API_BASE_URL = os.getenv("BACKEND_API_BASE_URL", "http://localhost:8000")
 
 
 def get_session_id_from_url() -> str | None:
     params = st.query_params
-    value = params.get("session_id")
+    # Prefer snake_case session_id, but support legacy camelCase if present
+    value = params.get("session_id") or params.get("sessionId")
     if isinstance(value, list):
         return value[0] if value else None
     return value
@@ -34,15 +30,38 @@ if not session_id:
     st.error("No session_id provided in the URL. Please open this app via the main application.")
     st.stop()
 
-# Optional: cache to avoid re-fetching every rerun
-# @st.cache_data(show_spinner=True)
-def load_session_payload(session_id: str):
-    if session_id == 'sample':
-        data = json.load(open('backend/app/constants/mapped_sample.json', 'r'))
-    else:
-        data = asyncio.run(get_session(session_id))
-        print('Session-data:', data)
-    return data
+@st.cache_data(show_spinner=True)
+def load_session_payload(session_id: str) -> Dict[str, Any] | None:
+    """
+    Load the session document for the given id by calling the FastAPI backend.
+
+    Special case: session_id == "sample" loads a local JSON sample.
+    """
+    if session_id == "sample":
+        sample_path = "backend/app/constants/mapped_sample.json"
+        try:
+            with open(sample_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except FileNotFoundError:
+            st.error(f"Sample file not found at {sample_path}")
+            return None
+        except Exception as exc:
+            st.error(f"Failed to load sample payload: {exc}")
+            return None
+
+    url = f"{BACKEND_API_BASE_URL.rstrip('/')}/sessions/{session_id}"
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        st.error(f"Failed to load session {session_id} from API: {exc}")
+        return None
+
+    try:
+        return resp.json()
+    except ValueError as exc:
+        st.error(f"Backend returned invalid JSON for session {session_id}: {exc}")
+        return None
 
 st.session_state["session_payload"] = load_session_payload(session_id)
 
