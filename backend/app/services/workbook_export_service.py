@@ -14,6 +14,7 @@ from ..core.cloudinary import upload_raw
 from ..core.config import settings
 from ..schemas.mapping import MappingResult
 from ..schemas.sessions import ExportAppliedField, ExportResponse
+from . import graph_client
 
 TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "constants" / "model_input_sheet.xlsx"
 TARGET_SHEET_NAME = "PERPETUITY MIDDLEMAN INPUT TAB"
@@ -128,6 +129,49 @@ WATERFALL_COLUMNS = {
     "moic_multiple": "M",
     "dollar_amount": "N",
 }
+
+
+def generate_workbook_file(session_id: str, mapping: MappingResult) -> Tuple[Path, List[ExportAppliedField]]:
+    """Build the Excel workbook on disk and return its path and applied fields.
+
+    This does not upload anywhere; callers can decide whether to upload or stream.
+    """
+    if not TEMPLATE_PATH.exists():
+        raise FileNotFoundError(f"Template workbook not found at {TEMPLATE_PATH}")
+
+    tmp_dir = Path(tempfile.mkdtemp())
+    tmp_path = tmp_dir / f"{session_id}-model.xlsx"
+    shutil.copy(TEMPLATE_PATH, tmp_path)
+
+    wb = load_workbook(tmp_path)
+    if TARGET_SHEET_NAME not in wb.sheetnames:
+        raise ValueError(f"Sheet '{TARGET_SHEET_NAME}' not found in template")
+    ws = wb[TARGET_SHEET_NAME]
+
+    applied_fields: List[ExportAppliedField] = []
+    _apply_scalar_values(ws, mapping.mapped, applied_fields)
+    _apply_unit_mix(ws, mapping.mapped, applied_fields)
+    _apply_other_income(ws, mapping.mapped, applied_fields)
+    _apply_waterfall(ws, mapping.mapped, applied_fields)
+
+    wb.save(tmp_path)
+    return tmp_path, applied_fields
+
+
+def upload_export_to_cloudinary(session_id: str, workbook_path: Path) -> str:
+    """Upload the generated workbook to Cloudinary and return a signed URL."""
+    folder = f"{settings.cloudinary_base_folder}/exports/{session_id}".rstrip("/")
+    upload_res = upload_raw(str(workbook_path), public_id="model-input", folder=folder)
+
+    public_id = upload_res.get("public_id", "")
+    signed_url = cloudinary.utils.private_download_url(
+        public_id,
+        "xlsx",
+        resource_type="raw",
+        type="private",
+        expires_at=int((datetime.utcnow().timestamp()) + 14400),
+    )
+    return signed_url
 
 
 def _coerce_value(value: Any) -> Any:
@@ -301,37 +345,36 @@ def _apply_waterfall(ws, mapped: Dict[str, Any], applied: List[ExportAppliedFiel
 
 
 def export_mapping(session_id: str, mapping: MappingResult) -> ExportResponse:
-    if not TEMPLATE_PATH.exists():
-        raise FileNotFoundError(f"Template workbook not found at {TEMPLATE_PATH}")
+    workbook_path, applied_fields = generate_workbook_file(session_id, mapping)
 
-    tmp_dir = Path(tempfile.mkdtemp())
-    tmp_path = tmp_dir / f"{session_id}-model.xlsx"
-    shutil.copy(TEMPLATE_PATH, tmp_path)
+    # Default fallback: local download route that regenerates/streams the file.
+    download_url = f"/sessions/{session_id}/export/download"
 
-    wb = load_workbook(tmp_path)
-    if TARGET_SHEET_NAME not in wb.sheetnames:
-        raise ValueError(f"Sheet '{TARGET_SHEET_NAME}' not found in template")
-    ws = wb[TARGET_SHEET_NAME]
+    # Preferred path: upload to Microsoft Graph and return a shareable view link.
+    try:
+        with open(workbook_path, "rb") as f:
+            content = f.read()
+        try:
+            item_id = graph_client.upload_export_workbook(
+                session_id,
+                f"{session_id}-model.xlsx",
+                content,
+            )
+            # Try anonymous link first so Office Online can open it without auth.
+            download_url = graph_client.create_view_link(item_id, scope="anonymous")
+        except Exception:
+            # If Graph upload or link creation fails, fall back to Cloudinary/local.
+            pass
+    except Exception:
+        # If reading the file fails, fall back to Cloudinary/local.
+        pass
 
-    applied_fields: List[ExportAppliedField] = []
-    _apply_scalar_values(ws, mapping.mapped, applied_fields)
-    _apply_unit_mix(ws, mapping.mapped, applied_fields)
-    _apply_other_income(ws, mapping.mapped, applied_fields)
-    _apply_waterfall(ws, mapping.mapped, applied_fields)
+    # If Graph did not produce an external URL, try Cloudinary next.
+    if not download_url.startswith("http"):
+        try:
+            download_url = upload_export_to_cloudinary(session_id, workbook_path)
+        except Exception:
+            # Keep the local /export/download fallback.
+            download_url = f"/sessions/{session_id}/export/download"
 
-    wb.save(tmp_path)
-
-    folder = f"{settings.cloudinary_base_folder}/exports/{session_id}".rstrip("/")
-    upload_res = upload_raw(str(tmp_path), public_id="model-input", folder=folder)
-
-    # Generate signed URL for private file access (valid for 4 hours)
-    public_id = upload_res.get("public_id", "")
-    signed_url = cloudinary.utils.private_download_url(
-        public_id,
-        "xlsx",
-        resource_type="raw",
-        type="private",
-        expires_at=int((datetime.utcnow().timestamp()) + 14400),
-    )
-
-    return ExportResponse(download_url=signed_url, applied_fields=applied_fields)
+    return ExportResponse(download_url=download_url, applied_fields=applied_fields)

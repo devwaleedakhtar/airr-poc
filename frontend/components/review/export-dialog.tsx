@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { ExportResult } from "@/types/mapping";
+import { API_BASE } from "@/lib/api";
 
 type Props = {
   open: boolean;
@@ -24,6 +25,19 @@ export default function ExportDialog({
   exportResult,
   sessionId,
 }: Props) {
+  const downloadUrl = exportResult.download_url.startsWith("http")
+    ? exportResult.download_url
+    : `${API_BASE}${exportResult.download_url}`;
+  const canEmbed =
+    downloadUrl.startsWith("https://") &&
+    !downloadUrl.includes("localhost") &&
+    !downloadUrl.includes("127.0.0.1");
+  const iframeSrc = canEmbed
+    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(
+        downloadUrl
+      )}`
+    : null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[90%] h-[90vh]">
@@ -39,11 +53,7 @@ export default function ExportDialog({
           <div className="flex items-center justify-end gap-2">
             <div className="flex flex-col gap-2">
               <Button asChild>
-                <a
-                  href={exportResult.download_url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
+                <a href={downloadUrl} target="_blank" rel="noreferrer">
                   Download Workbook
                 </a>
               </Button>
@@ -55,15 +65,21 @@ export default function ExportDialog({
           </div>
 
           <div className="rounded border overflow-hidden flex-1 overflow-hidden">
-            <iframe
-              src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(
-                exportResult.download_url
-              )}`}
-              width="100%"
-              height="500"
-              className="border-0"
-              title="Excel Preview"
-            />
+            {iframeSrc ? (
+              <iframe
+                src={iframeSrc}
+                width="100%"
+                height="500"
+                className="border-0"
+                title="Excel Preview"
+              />
+            ) : (
+              <div className="p-4 text-sm text-muted-foreground">
+                Preview is unavailable. Use{" "}
+                <span className="font-medium">Download Workbook</span> to open
+                the file in Excel.
+              </div>
+            )}
           </div>
         </div>
       </DialogContent>

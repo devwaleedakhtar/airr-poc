@@ -120,6 +120,26 @@ def upload_workbook(workbook_id: str, filename: str, content: bytes) -> str:
     return str(item_id)
 
 
+def upload_export_workbook(session_id: str, filename: str, content: bytes) -> str:
+    """Upload an exported workbook into the configured drive and return the item id.
+
+    Files are stored under /airr-poc/exports/{session_id}/{filename}.
+    """
+    safe_name = filename or "model.xlsx"
+    path = f"/airr-poc/exports/{session_id}/{safe_name}"
+    url = (
+        f"{settings.graph_base_url}/drives/{settings.graph_drive_id}"
+        f"/root:{path}:/content"
+    )
+    resp = requests.put(url, headers=_headers(), data=content, timeout=120)
+    _raise_for_graph_error(resp, "Graph upload export workbook")
+    item = resp.json()
+    item_id = item.get("id")
+    if not item_id:
+        raise RuntimeError("Graph upload export workbook response missing item id")
+    return str(item_id)
+
+
 def create_workbook_session(item_id: str) -> str:
     """Create a persistent workbook session for a given drive item."""
     url = (
@@ -308,4 +328,29 @@ def download_pdf(item_id: str, session_id: str) -> bytes:
     )
     _raise_for_graph_error(resp, "Graph download workbook as PDF")
     return resp.content
+
+
+def create_view_link(item_id: str, scope: str = "anonymous") -> str:
+    """Create a view-only sharing link for the given drive item.
+
+    By default uses anonymous scope so the link can be opened by Office Online
+    without authentication, subject to tenant sharing policies.
+    """
+    url = (
+        f"{settings.graph_base_url}/drives/{settings.graph_drive_id}"
+        f"/items/{item_id}/createLink"
+    )
+    resp = requests.post(
+        url,
+        headers=_headers(),
+        json={"type": "view", "scope": scope},
+        timeout=30,
+    )
+    _raise_for_graph_error(resp, f"Graph createLink ({scope})")
+    payload = resp.json()
+    link = payload.get("link") or {}
+    web_url = link.get("webUrl")
+    if not web_url:
+        raise RuntimeError("Graph createLink response missing webUrl")
+    return str(web_url)
 
